@@ -44,16 +44,46 @@ mint broken-links
 ### Content Organization
 Documentation is organized into tabbed sections defined in `docs.json`:
 
+**Navigation Hierarchy:**
+```
+Tab (标签页)
+  └─ Group (分类/组)
+       └─ Pages (页面列表)
+```
+
+**Current Structure:**
+
 1. **Guides Tab**:
-   - Getting started (index, quickstart, development)
-   - Customization (settings, navigation)
-   - Writing content (markdown, code, images, reusable-snippets)
-   - AI tools (cursor, claude-code, windsurf)
+   - **Getting started** (group)
+     - Introduction → `index.mdx`
+     - Quickstart → `quickstart.mdx`
+     - Development → `development.mdx`
+   - **Customization** (group)
+     - Global Settings → `essentials/settings.mdx`
+     - Navigation → `essentials/navigation.mdx`
+   - **Writing content** (group)
+     - Markdown syntax → `essentials/markdown.mdx`
+     - Code blocks → `essentials/code.mdx`
+     - Images and embeds → `essentials/images.mdx`
+     - Reusable snippets → `essentials/reusable-snippets.mdx`
+   - **AI tools** (group)
+     - Cursor → `ai-tools/cursor.mdx`
+     - Claude Code → `ai-tools/claude-code.mdx`
+     - Windsurf → `ai-tools/windsurf.mdx`
 
 2. **API Reference Tab**:
-   - API introduction
-   - Endpoint examples (GET, POST, DELETE, webhooks)
-   - OpenAPI specification (`api-reference/openapi.json`)
+   - **API documentation** (group)
+     - Introduction → `api-reference/introduction.mdx`
+   - **Endpoint examples** (group)
+     - GET → `api-reference/endpoint/get.mdx`
+     - POST → `api-reference/endpoint/create.mdx`
+     - DELETE → `api-reference/endpoint/delete.mdx`
+     - Webhook → `api-reference/endpoint/webhook.mdx`
+
+**Key Mapping Rule:**
+- Path in `docs.json` WITHOUT `.mdx` extension maps to actual file
+- Example: `"essentials/settings"` → `essentials/settings.mdx`
+- Example: `"index"` → `index.mdx`
 
 ### File Types
 - **`.mdx` files**: Content pages using MDX (Markdown with React components)
@@ -74,9 +104,27 @@ To add/remove pages or change navigation:
 
 ### Creating New Pages
 1. Create `.mdx` file in appropriate directory
-2. Add frontmatter with `title` and `description`
-3. Reference the page (without extension) in `docs.json` navigation
+2. Add frontmatter with `title` and `description`:
+   ```mdx
+   ---
+   title: "Page Title"
+   description: "Page description"
+   ---
+   ```
+3. Add the page path (without `.mdx` extension) to the appropriate `pages` array in `docs.json`
 4. Use Mintlify components (Card, Accordion, Tip, Note, etc.) for rich content
+
+**Example - Adding a new page under "Getting started":**
+1. Create file: `installation.mdx`
+2. Edit `docs.json` at line 18-22:
+   ```json
+   "pages": [
+     "index",
+     "quickstart",
+     "installation",  // Add this line
+     "development"
+   ]
+   ```
 
 ### API Documentation
 - Edit `api-reference/openapi.json` to update API specifications
