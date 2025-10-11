@@ -1,0 +1,157 @@
+---
+title: "工具系统"
+description: "让 AI 调用外部工具完成复杂任务"
+---
+
+## 什么是工具？
+
+工具（Tools）允许 AI 模型调用外部功能来完成单纯文本生成无法完成的任务，如执行代码、查询数据库、生成特定格式的回复等。
+
+## 查看可用工具
+
+使用 `GET /api/v1/tools` 端点查询可用工具：
+
+```bash
+curl -X GET https://huajune.duliday.com/api/v1/tools \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+响应示例：
+
+```json
+{
+  "success": true,
+  "data": {
+    "tools": [
+      {
+        "name": "bash",
+        "requiresSandbox": false,
+        "requiredContext": []
+      },
+      {
+        "name": "zhipin_reply_generator",
+        "requiresSandbox": false,
+        "requiredContext": ["configData", "replyPrompts"]
+      }
+    ]
+  }
+}
+```
+
+## 内置工具
+
+### bash
+
+执行 Bash 命令，适用于文件操作、系统命令等场景。
+
+**所需上下文**：无
+
+**示例**：
+
+```json
+{
+  "allowedTools": ["bash"]
+}
+```
+
+### zhipin_reply_generator
+
+生成 BOSS 直聘招聘回复，用于自动化候选人沟通。
+
+**所需上下文**：
+
+- `configData`: 品牌配置数据
+- `replyPrompts`: 回复提示词配置
+
+**示例**：详见[工具调用功能](/features/tool-calling)
+
+## 启用工具
+
+在请求中使用 `allowedTools` 数组指定要启用的工具：
+
+```json
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [...],
+  "allowedTools": ["bash", "zhipin_reply_generator"]
+}
+```
+
+<Note>
+  如果不指定 `allowedTools` 或传入空数组，则不启用任何工具（纯文本对话）。
+</Note>
+
+## 工具上下文
+
+某些工具需要额外的上下文信息才能正常工作。通过 `context` 和 `toolContext` 提供：
+
+```json
+{
+  "allowedTools": ["zhipin_reply_generator"],
+  "context": {
+    "configData": { ... },
+    "replyPrompts": { ... }
+  },
+  "toolContext": {
+    "zhipin_reply_generator": {
+      "replyPrompts": { "custom_key": "custom_value" }
+    }
+  }
+}
+```
+
+<Tip>`toolContext` 中的配置会覆盖顶层 `context` 中的同名字段。</Tip>
+
+## 上下文策略
+
+使用 `contextStrategy` 参数控制缺失上下文时的行为：
+
+| 策略            | 行为                           |
+| --------------- | ------------------------------ |
+| `error`（默认） | 返回 400 错误，列出缺失字段    |
+| `skip`          | 跳过无法实例化的工具，继续执行 |
+| `report`        | 仅返回验证报告，不执行请求     |
+
+示例：
+
+```json
+{
+  "allowedTools": ["zhipin_reply_generator"],
+  "contextStrategy": "skip"
+}
+```
+
+## 验证模式
+
+使用 `validateOnly: true` 进行"干跑"，检查工具配置是否正确：
+
+```json
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [...],
+  "allowedTools": ["zhipin_reply_generator"],
+  "validateOnly": true
+}
+```
+
+返回验证报告而不实际执行对话。
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="工具调用示例"
+    icon="code"
+    href="/features/tool-calling"
+  >
+    查看完整的工具调用示例代码
+  </Card>
+
+  <Card
+    title="上下文管理"
+    icon="gear"
+    href="/concepts/context"
+  >
+    深入了解上下文配置
+  </Card>
+</CardGroup>

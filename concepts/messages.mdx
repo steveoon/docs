@@ -1,0 +1,122 @@
+---
+title: "消息格式"
+description: "理解对话消息的结构和格式要求"
+---
+
+## 消息结构
+
+花卷智能体 API 支持两种消息格式：
+
+### 1. 简化格式
+
+```json
+{
+  "role": "user",
+  "content": "你好，请介绍一下你自己"
+}
+```
+
+### 2. AI SDK 格式（推荐）
+
+```json
+{
+  "role": "user",
+  "parts": [
+    {
+      "type": "text",
+      "text": "你好，请介绍一下你自己"
+    }
+  ]
+}
+```
+
+<Tip>
+  API 会自动将简化格式转换为 AI SDK 格式，你可以使用任一种格式。
+</Tip>
+
+## 角色类型
+
+| 角色 | 说明 | 示例 |
+|------|------|------|
+| `user` | 用户消息 | 用户的问题或指令 |
+| `assistant` | AI 助手消息 | AI 的回复内容 |
+
+## 多轮对话
+
+通过 `messages` 数组传递完整的对话历史：
+
+```json
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [
+    {
+      "role": "user",
+      "content": "1+1等于几？"
+    },
+    {
+      "role": "assistant",
+      "content": "1+1等于2"
+    },
+    {
+      "role": "user",
+      "content": "那再加3呢？"
+    }
+  ]
+}
+```
+
+## Parts 类型
+
+当使用 AI SDK 格式时，`parts` 数组支持多种类型：
+
+### text
+纯文本内容：
+
+```json
+{
+  "type": "text",
+  "text": "这是文本内容"
+}
+```
+
+### tool-call
+工具调用（由 AI 生成）：
+
+```json
+{
+  "type": "tool-call",
+  "toolName": "bash",
+  "args": { "command": "ls -la" }
+}
+```
+
+### tool-result
+工具执行结果：
+
+```json
+{
+  "type": "tool-result",
+  "toolName": "bash",
+  "result": "文件列表..."
+}
+```
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="系统提示词"
+    icon="message-lines"
+    href="/concepts/system-prompts"
+  >
+    了解如何配置系统提示词
+  </Card>
+
+  <Card
+    title="消息剪裁"
+    icon="scissors"
+    href="/features/message-pruning"
+  >
+    优化长对话的 token 使用
+  </Card>
+</CardGroup>

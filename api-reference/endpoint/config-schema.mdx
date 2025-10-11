@@ -1,0 +1,549 @@
+---
+title: "GET /config-schema"
+description: "获取配置字段的 Schema 定义"
+---
+
+## 端点
+
+```
+GET https://huajune.duliday.com/api/v1/config-schema
+```
+
+## 认证
+
+```http
+Authorization: Bearer YOUR_API_KEY
+```
+
+## 请求参数
+
+此端点不需要任何参数。
+
+## 响应格式
+
+<ResponseField name="success" type="boolean">
+  请求是否成功
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  响应数据对象
+
+  <Expandable title="data 对象属性">
+    <ResponseField name="schema" type="object">
+      配置字段的 JSON Schema 定义
+
+      包含所有可用配置字段的类型、验证规则和说明
+    </ResponseField>
+
+    <ResponseField name="fields" type="array">
+      配置字段数组,每个字段包含:
+
+      <Expandable title="field 对象属性">
+        <ResponseField name="key" type="string">
+          字段键名
+
+          示例: `configData`, `replyPrompts`
+        </ResponseField>
+
+        <ResponseField name="type" type="string">
+          字段数据类型
+
+          常见类型: `object`, `string`, `number`, `array`, `boolean`
+        </ResponseField>
+
+        <ResponseField name="required" type="boolean">
+          是否为必需字段
+        </ResponseField>
+
+        <ResponseField name="description" type="string">
+          字段说明
+        </ResponseField>
+
+        <ResponseField name="schema" type="object">
+          详细的 JSON Schema 定义(可选)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## 响应示例
+
+```json
+{
+  "success": true,
+  "data": {
+    "schema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "configData": {
+          "type": "object",
+          "description": "品牌配置数据",
+          "properties": {
+            "brandName": { "type": "string" },
+            "industry": { "type": "string" }
+          }
+        },
+        "replyPrompts": {
+          "type": "object",
+          "description": "回复提示词配置",
+          "properties": {
+            "greeting": { "type": "string" },
+            "farewell": { "type": "string" }
+          }
+        }
+      }
+    },
+    "fields": [
+      {
+        "key": "configData",
+        "type": "object",
+        "required": false,
+        "description": "品牌配置数据,包含品牌名称、行业等信息",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "brandName": { "type": "string", "description": "品牌名称" },
+            "industry": { "type": "string", "description": "所属行业" }
+          }
+        }
+      },
+      {
+        "key": "replyPrompts",
+        "type": "object",
+        "required": false,
+        "description": "回复提示词配置,用于生成个性化回复",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "greeting": { "type": "string", "description": "问候语模板" },
+            "farewell": { "type": "string", "description": "告别语模板" }
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+## 使用场景
+
+<AccordionGroup>
+  <Accordion title="动态表单生成">
+    根据 Schema 动态生成配置表单:
+
+    ```javascript
+    async function generateConfigForm() {
+      const response = await fetch('https://huajune.duliday.com/api/v1/config-schema', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const data = await response.json();
+
+      const formFields = data.data.fields.map(field => ({
+        name: field.key,
+        type: field.type,
+        label: field.description,
+        required: field.required,
+        schema: field.schema
+      }));
+
+      return formFields;
+    }
+
+    // 生成表单
+    const fields = await generateConfigForm();
+    fields.forEach(field => {
+      console.log(`${field.label} (${field.type})${field.required ? ' *' : ''}`);
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="配置验证">
+    在提交前验证配置数据:
+
+    ```javascript
+    async function validateConfig(config) {
+      const response = await fetch('https://huajune.duliday.com/api/v1/config-schema', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const data = await response.json();
+
+      const errors = [];
+
+      data.data.fields.forEach(field => {
+        if (field.required && !(field.key in config)) {
+          errors.push(`缺少必需字段: ${field.key}`);
+        }
+
+        if (config[field.key] && typeof config[field.key] !== field.type) {
+          errors.push(`${field.key} 类型错误: 期望 ${field.type}, 实际 ${typeof config[field.key]}`);
+        }
+      });
+
+      return {
+        valid: errors.length === 0,
+        errors: errors
+      };
+    }
+
+    const validation = await validateConfig({
+      configData: "invalid" // 应该是 object
+    });
+
+    if (!validation.valid) {
+      console.error('验证失败:', validation.errors);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="JSON Schema 验证">
+    使用标准 JSON Schema 验证库:
+
+    ```javascript
+    import Ajv from 'ajv';
+
+    async function validateWithJsonSchema(config) {
+      const response = await fetch('https://huajune.duliday.com/api/v1/config-schema', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const data = await response.json();
+
+      const ajv = new Ajv();
+      const validate = ajv.compile(data.data.schema);
+
+      const valid = validate(config);
+
+      return {
+        valid: valid,
+        errors: validate.errors
+      };
+    }
+
+    const result = await validateWithJsonSchema({
+      configData: { brandName: "测试品牌" },
+      replyPrompts: { greeting: "你好" }
+    });
+
+    if (!result.valid) {
+      console.error('Schema 验证失败:', result.errors);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="文档生成">
+    根据 Schema 自动生成配置文档:
+
+    ```javascript
+    async function generateConfigDocs() {
+      const response = await fetch('https://huajune.duliday.com/api/v1/config-schema', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const data = await response.json();
+
+      const docs = data.data.fields.map(field => {
+        const required = field.required ? '(必需)' : '(可选)';
+        const properties = field.schema?.properties
+          ? Object.entries(field.schema.properties).map(([key, value]) =>
+              `  - ${key}: ${value.type} - ${value.description || ''}`
+            ).join('\n')
+          : '';
+
+        return `
+### ${field.key} ${required}
+
+**类型**: ${field.type}
+
+**说明**: ${field.description}
+
+${properties ? '**属性**:\n' + properties : ''}
+        `.trim();
+      }).join('\n\n');
+
+      return docs;
+    }
+
+    const docs = await generateConfigDocs();
+    console.log(docs);
+    ```
+  </Accordion>
+
+  <Accordion title="IDE 自动补全">
+    生成 TypeScript 类型定义:
+
+    ```javascript
+    async function generateTypeScript() {
+      const response = await fetch('https://huajune.duliday.com/api/v1/config-schema', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const data = await response.json();
+
+      const types = data.data.fields.map(field => {
+        const optional = field.required ? '' : '?';
+
+        if (field.schema?.properties) {
+          const props = Object.entries(field.schema.properties)
+            .map(([key, value]) => `  ${key}: ${value.type};`)
+            .join('\n');
+
+          return `${field.key}${optional}: {\n${props}\n}`;
+        }
+
+        return `${field.key}${optional}: ${field.type}`;
+      }).join(';\n');
+
+      return `interface Config {\n  ${types};\n}`;
+    }
+
+    const tsType = await generateTypeScript();
+    console.log(tsType);
+    // 输出:
+    // interface Config {
+    //   configData?: {
+    //     brandName: string;
+    //     industry: string;
+    //   };
+    //   replyPrompts?: {
+    //     greeting: string;
+    //     farewell: string;
+    //   };
+    // }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## 示例代码
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET https://huajune.duliday.com/api/v1/config-schema \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```javascript JavaScript
+const response = await fetch('https://huajune.duliday.com/api/v1/config-schema', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`
+  }
+});
+
+const data = await response.json();
+
+console.log('配置字段:');
+data.data.fields.forEach(field => {
+  console.log(`- ${field.key} (${field.type}): ${field.description}`);
+});
+```
+
+```python Python
+import requests
+
+url = 'https://huajune.duliday.com/api/v1/config-schema'
+headers = {
+    'Authorization': f'Bearer {api_key}'
+}
+
+response = requests.get(url, headers=headers)
+data = response.json()
+
+print('配置字段:')
+for field in data['data']['fields']:
+    print(f"- {field['key']} ({field['type']}): {field['description']}")
+```
+
+```javascript JavaScript (验证配置)
+async function isValidConfig(config) {
+  const response = await fetch('https://huajune.duliday.com/api/v1/config-schema', {
+    headers: { 'Authorization': `Bearer ${apiKey}` }
+  });
+  const data = await response.json();
+
+  // 检查类型
+  for (const field of data.data.fields) {
+    if (config[field.key]) {
+      const actualType = Array.isArray(config[field.key]) ? 'array' : typeof config[field.key];
+      if (actualType !== field.type) {
+        console.error(`${field.key} 类型错误: 期望 ${field.type}, 实际 ${actualType}`);
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+const config = {
+  configData: { brandName: "测试" },
+  replyPrompts: { greeting: "你好" }
+};
+
+const valid = await isValidConfig(config);
+console.log('配置有效:', valid);
+```
+
+```python Python (生成文档)
+import requests
+
+response = requests.get(
+    'https://huajune.duliday.com/api/v1/config-schema',
+    headers={'Authorization': f'Bearer {api_key}'}
+)
+
+data = response.json()
+
+print('# 配置字段文档\n')
+for field in data['data']['fields']:
+    required = '(必需)' if field['required'] else '(可选)'
+    print(f"## {field['key']} {required}\n")
+    print(f"**类型**: {field['type']}\n")
+    print(f"**说明**: {field['description']}\n")
+
+    if 'schema' in field and 'properties' in field['schema']:
+        print('**属性**:')
+        for key, value in field['schema']['properties'].items():
+            desc = value.get('description', '')
+            print(f"- `{key}`: {value['type']} - {desc}")
+        print()
+```
+
+</CodeGroup>
+
+## JSON Schema 标准
+
+返回的 Schema 遵循 [JSON Schema Draft 7](https://json-schema.org/specification-links.html#draft-7) 标准,可以与标准验证库配合使用:
+
+### Node.js 验证库
+
+```bash
+npm install ajv
+```
+
+```javascript
+import Ajv from 'ajv';
+
+const ajv = new Ajv();
+const validate = ajv.compile(schema);
+const valid = validate(data);
+```
+
+### Python 验证库
+
+```bash
+pip install jsonschema
+```
+
+```python
+from jsonschema import validate, ValidationError
+
+try:
+    validate(instance=data, schema=schema)
+    print("验证通过")
+except ValidationError as e:
+    print(f"验证失败: {e.message}")
+```
+
+## 与工具系统的关系
+
+配置 Schema 定义了 `context` 和 `toolContext` 中可用的字段。结合 `/api/v1/tools` 端点:
+
+1. `/api/v1/tools` 返回工具的 `requiredContext`(需要哪些字段)
+2. `/api/v1/config-schema` 返回这些字段的结构定义(字段是什么样的)
+
+示例工作流:
+
+```javascript
+// 1. 获取工具要求
+const toolsRes = await fetch('/api/v1/tools', {
+  headers: { 'Authorization': `Bearer ${apiKey}` }
+});
+const tools = await toolsRes.json();
+
+const tool = tools.data.tools.find(t => t.name === 'zhipin_reply_generator');
+console.log('需要的上下文:', tool.requiredContext);
+// ['configData', 'replyPrompts']
+
+// 2. 获取字段定义
+const schemaRes = await fetch('/api/v1/config-schema', {
+  headers: { 'Authorization': `Bearer ${apiKey}` }
+});
+const schema = await schemaRes.json();
+
+tool.requiredContext.forEach(ctx => {
+  const field = schema.data.fields.find(f => f.key === ctx);
+  console.log(`${ctx} 的结构:`, field.schema);
+});
+```
+
+## 常见错误
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid or missing API key",
+  "statusCode": 401
+}
+```
+
+**解决方案**: 检查 API Key 是否正确
+
+详见 [错误码表](/api-reference/error-codes)
+
+## 最佳实践
+
+<CardGroup cols={2}>
+  <Card title="缓存 Schema" icon="database">
+    Schema 定义变化不频繁,建议缓存 12-24 小时
+  </Card>
+
+  <Card title="客户端验证" icon="check">
+    使用 Schema 在客户端提前验证,减少无效请求
+  </Card>
+
+  <Card title="自动化工具" icon="robot">
+    构建脚本自动生成类型定义和文档
+  </Card>
+
+  <Card title="版本管理" icon="code-branch">
+    定期检查 Schema 变更,更新客户端代码
+  </Card>
+</CardGroup>
+
+## 相关文档
+
+<CardGroup cols={2}>
+  <Card
+    title="上下文管理"
+    icon="gear"
+    href="/concepts/context"
+  >
+    了解上下文配置的核心概念
+  </Card>
+
+  <Card
+    title="工具系统"
+    icon="wrench"
+    href="/concepts/tools"
+  >
+    查看工具的上下文要求
+  </Card>
+
+  <Card
+    title="GET /tools"
+    icon="list"
+    href="/api-reference/endpoint/tools"
+  >
+    获取工具的 requiredContext
+  </Card>
+
+  <Card
+    title="工具调用"
+    icon="code"
+    href="/features/tool-calling"
+  >
+    查看完整的上下文使用示例
+  </Card>
+</CardGroup>

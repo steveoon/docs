@@ -1,0 +1,126 @@
+---
+title: "上下文管理"
+description: "理解和配置请求上下文"
+---
+
+## 什么是上下文？
+
+上下文（Context）是传递给 API 的配置信息，用于：
+
+- 配置工具所需的参数
+- 提供业务相关的配置数据
+- 定义系统提示词模板
+
+## 上下文结构
+
+### 顶层 context
+
+所有工具共享的通用上下文：
+
+```json
+{
+  "context": {
+    "preferredBrand": "品牌名称",
+    "modelConfig": {
+      "providerConfigs": {...}
+    },
+    "configData": {...},
+    "replyPrompts": {...},
+    "systemPrompts": {...}
+  }
+}
+```
+
+### toolContext
+
+为特定工具提供专属上下文：
+
+```json
+{
+  "toolContext": {
+    "zhipin_reply_generator": {
+      "configData": {...},
+      "replyPrompts": {...}
+    }
+  }
+}
+```
+
+<Note>`toolContext` 中的配置会覆盖 `context` 中的同名字段。</Note>
+
+## 常用上下文字段
+
+使用 `GET /api/v1/config-schema` 查看完整的字段说明：
+
+```bash
+curl -X GET https://huajune.duliday.com/api/v1/config-schema \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+### configData
+
+业务配置数据，工具 `zhipin_reply_generator` 必需。
+
+### replyPrompts
+
+回复提示词配置，定义不同场景下的回复模板。
+
+### systemPrompts
+
+系统提示词映射表，通过 `promptType` 引用。
+
+### sandboxId
+
+沙箱 ID，需要沙箱的工具必需（如 `computer`）。
+
+## 上下文策略
+
+通过 `contextStrategy` 控制缺失上下文的处理方式：
+
+```json
+{
+  "contextStrategy": "error" // error | skip | report
+}
+```
+
+| 策略     | 行为                        |
+| -------- | --------------------------- |
+| `error`  | 返回 400 错误并列出缺失字段 |
+| `skip`   | 跳过无法初始化的工具        |
+| `report` | 返回验证报告，不执行请求    |
+
+## 验证上下文
+
+使用 `validateOnly` 模式检查上下文配置：
+
+```json
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [...],
+  "allowedTools": ["zhipin_reply_generator"],
+  "context": {...},
+  "validateOnly": true
+}
+```
+
+返回验证报告，说明哪些工具可以成功初始化，哪些缺少必需的上下文。
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="工具系统"
+    icon="wrench"
+    href="/concepts/tools"
+  >
+    了解工具如何使用上下文
+  </Card>
+
+  <Card
+    title="工具调用"
+    icon="code"
+    href="/features/tool-calling"
+  >
+    查看完整的工具调用示例
+  </Card>
+</CardGroup>

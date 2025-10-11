@@ -1,0 +1,335 @@
+---
+title: "请求与响应"
+description: "API 请求和响应格式详解"
+---
+
+## 请求格式
+
+### HTTP 方法
+
+| 方法   | 用途                   |
+| ------ | ---------------------- |
+| POST   | 发起对话 (/chat)       |
+| GET    | 查询资源（模型、工具等）|
+
+### 请求头
+
+所有请求必须包含以下头部:
+
+```http
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+```
+
+### 请求体示例
+
+<CodeGroup>
+
+```json 基础对话
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好"
+    }
+  ],
+  "stream": false
+}
+```
+
+```json 完整参数
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "systemPrompt": "你是一个专业的编程助手",
+  "messages": [
+    {
+      "role": "user",
+      "content": "解释一下异步编程"
+    }
+  ],
+  "allowedTools": ["bash"],
+  "context": {
+    "configData": { ... }
+  },
+  "prune": true,
+  "pruneOptions": {
+    "maxOutputTokens": 15000,
+    "targetTokens": 8000,
+    "preserveRecentMessages": 2
+  },
+  "stream": true
+}
+```
+
+</CodeGroup>
+
+## 响应格式
+
+### 成功响应（非流式）
+
+```json
+{
+  "success": true,
+  "data": {
+    "messages": [
+      {
+        "id": "msg_abc123",
+        "role": "assistant",
+        "parts": [
+          {
+            "type": "text",
+            "text": "你好！我是一个AI助手..."
+          }
+        ]
+      }
+    ],
+    "usage": {
+      "inputTokens": 15,
+      "outputTokens": 45,
+      "totalTokens": 60
+    },
+    "correlationId": "req_abc123"
+  }
+}
+```
+
+### 成功响应（流式）
+
+流式响应使用 Server-Sent Events (SSE) 格式:
+
+```
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"你好"}}
+
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"！"}}
+
+data: {"type":"content_block_stop","index":0}
+
+data: {"type":"message_stop","usage":{"inputTokens":15,"outputTokens":45}}
+
+data: [DONE]
+```
+
+### 响应头
+
+响应会包含以下有用的头部信息:
+
+| 头部                   | 说明                          |
+| ---------------------- | ----------------------------- |
+| X-Message-Pruned       | 是否进行了消息剪裁 (true/false) |
+| X-Correlation-Id       | 请求关联 ID                   |
+| X-RateLimit-Limit      | 速率限制总数                  |
+| X-RateLimit-Remaining  | 剩余请求数                    |
+| X-RateLimit-Reset      | 限制重置时间戳                |
+
+## 消息格式
+
+### 简单格式（推荐）
+
+最直接的消息格式:
+
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好"
+    },
+    {
+      "role": "assistant",
+      "content": "你好！有什么我可以帮助你的吗？"
+    },
+    {
+      "role": "user",
+      "content": "介绍一下 Python"
+    }
+  ]
+}
+```
+
+### AI SDK 格式
+
+兼容 Vercel AI SDK 的消息格式:
+
+```json
+{
+  "messages": [
+    {
+      "id": "msg_1",
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "text": "你好"
+        }
+      ]
+    },
+    {
+      "id": "msg_2",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "text",
+          "text": "你好！"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 工具调用消息
+
+包含工具调用的消息格式:
+
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "查看当前目录"
+    },
+    {
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool_use",
+          "id": "tool_abc",
+          "name": "bash",
+          "input": { "command": "ls -la" }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "tool_abc",
+          "content": "total 24\ndrwxr-xr-x  5 user  staff  160 ..."
+        }
+      ]
+    }
+  ]
+}
+```
+
+## 常用参数
+
+### model (必需)
+
+AI 模型标识符,格式为 `provider/model`:
+
+```json
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219"
+}
+```
+
+### systemPrompt (可选)
+
+自定义系统提示词:
+
+```json
+{
+  "systemPrompt": "你是一个专业的 Python 开发导师"
+}
+```
+
+### stream (可选)
+
+是否启用流式输出,默认 `false`:
+
+```json
+{
+  "stream": true  // 启用流式输出
+}
+```
+
+### allowedTools (可选)
+
+允许 AI 使用的工具列表:
+
+```json
+{
+  "allowedTools": ["bash", "zhipin_reply_generator"]
+}
+```
+
+### prune (可选)
+
+是否启用消息剪裁,默认 `false`:
+
+```json
+{
+  "prune": true,
+  "pruneOptions": {
+    "maxOutputTokens": 15000,
+    "targetTokens": 8000,
+    "preserveRecentMessages": 2
+  }
+}
+```
+
+### context (可选)
+
+为工具提供上下文数据:
+
+```json
+{
+  "context": {
+    "configData": { ... },
+    "replyPrompts": { ... }
+  }
+}
+```
+
+### validateOnly (可选)
+
+仅验证参数,不执行实际请求:
+
+```json
+{
+  "validateOnly": true
+}
+```
+
+## Token 使用统计
+
+响应中的 `usage` 字段包含 Token 使用情况:
+
+```json
+{
+  "usage": {
+    "inputTokens": 150,    // 输入 Token 数
+    "outputTokens": 450,   // 输出 Token 数
+    "totalTokens": 600     // 总 Token 数
+  }
+}
+```
+
+<Tip>
+  使用 `prune: true` 可以显著减少 `inputTokens`,降低 API 调用成本。
+</Tip>
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="错误码参考"
+    icon="triangle-exclamation"
+    href="/api-reference/error-codes"
+  >
+    了解所有可能的错误类型
+  </Card>
+
+  <Card
+    title="Chat API"
+    icon="message"
+    href="/api-reference/endpoint/chat"
+  >
+    查看 /chat 端点详细文档
+  </Card>
+</CardGroup>

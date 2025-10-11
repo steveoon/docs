@@ -1,0 +1,445 @@
+---
+title: "错误码表"
+description: "API 错误码完整参考"
+---
+
+## HTTP 状态码
+
+| 状态码 | 错误类型            | 说明               |
+| ------ | ------------------- | ------------------ |
+| 200    | -                   | 请求成功           |
+| 400    | BadRequest          | 请求参数错误       |
+| 401    | Unauthorized        | 认证失败           |
+| 403    | Forbidden           | 权限不足           |
+| 404    | NotFound            | 资源不存在         |
+| 409    | Conflict            | 资源冲突           |
+| 429    | RateLimitExceeded   | 超过速率限制       |
+| 500    | InternalServerError | 服务器内部错误     |
+| 503    | ServiceUnavailable  | 服务暂时不可用     |
+
+## 错误响应格式
+
+所有错误响应遵循统一格式:
+
+```json
+{
+  "error": "ErrorType",
+  "message": "Human-readable error message",
+  "details": {
+    "key": "additional info"
+  },
+  "statusCode": 400,
+  "correlationId": "req_abc123"
+}
+```
+
+## 详细错误说明
+
+### 400 Bad Request
+
+#### 缺少必需参数
+
+```json
+{
+  "error": "BadRequest",
+  "message": "Missing required field: model",
+  "statusCode": 400,
+  "correlationId": "req_abc123"
+}
+```
+
+**原因**: 请求体缺少必需的 `model` 字段
+
+**解决方案**: 确保请求包含所有必需参数
+
+#### 无效的模型 ID
+
+```json
+{
+  "error": "BadRequest",
+  "message": "Invalid model format. Expected 'provider/model'",
+  "statusCode": 400,
+  "correlationId": "req_def456"
+}
+```
+
+**原因**: 模型 ID 格式不正确
+
+**解决方案**: 使用正确的格式,如 `anthropic/claude-3-7-sonnet-20250219`
+
+#### 缺少工具上下文
+
+```json
+{
+  "error": "BadRequest",
+  "message": "Missing required context for tool: zhipin_reply_generator",
+  "details": {
+    "missingContext": ["configData", "replyPrompts"],
+    "tools": ["zhipin_reply_generator"]
+  },
+  "statusCode": 400,
+  "correlationId": "req_ghi789"
+}
+```
+
+**原因**: 工具缺少必需的上下文参数
+
+**解决方案**:
+1. 在 `context` 或 `toolContext` 中提供缺失字段
+2. 使用 `contextStrategy: "skip"` 跳过该工具
+3. 使用 `GET /api/v1/tools` 查看工具的 `requiredContext`
+
+#### 消息格式错误
+
+```json
+{
+  "error": "BadRequest",
+  "message": "Invalid message format. Messages must be an array",
+  "statusCode": 400,
+  "correlationId": "req_jkl012"
+}
+```
+
+**原因**: `messages` 字段不是数组格式
+
+**解决方案**: 确保 `messages` 是一个数组,包含 role 和 content 字段
+
+### 401 Unauthorized
+
+#### API Key 无效或缺失
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid or missing API key",
+  "statusCode": 401,
+  "correlationId": "req_mno345"
+}
+```
+
+**原因**: API Key 无效、过期或未提供
+
+**解决方案**:
+1. 检查 API Key 是否正确
+2. 确认 Authorization 头格式: `Bearer YOUR_API_KEY`
+3. 验证 API Key 是否已过期
+4. 联系管理员重新生成 API Key
+
+#### 认证头格式错误
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid authorization header format",
+  "statusCode": 401,
+  "correlationId": "req_pqr678"
+}
+```
+
+**原因**: Authorization 头格式不正确
+
+**解决方案**: 使用正确格式 `Authorization: Bearer YOUR_API_KEY`
+
+### 403 Forbidden
+
+#### 模型不可用
+
+```json
+{
+  "error": "Forbidden",
+  "message": "Model not available with your API key",
+  "statusCode": 403,
+  "correlationId": "req_stu901"
+}
+```
+
+**原因**: 请求的模型不在你的许可列表中
+
+**解决方案**:
+1. 使用 `GET /api/v1/models` 查看可用模型
+2. 联系管理员升级权限
+3. 使用许可列表中的其他模型
+
+#### 工具不可用
+
+```json
+{
+  "error": "Forbidden",
+  "message": "Tool 'custom_tool' not available with your API key",
+  "statusCode": 403,
+  "correlationId": "req_vwx234"
+}
+```
+
+**原因**: 请求的工具不在你的许可列表中
+
+**解决方案**:
+1. 使用 `GET /api/v1/tools` 查看可用工具
+2. 联系管理员启用该工具
+3. 从 `allowedTools` 中移除不可用的工具
+
+### 404 Not Found
+
+```json
+{
+  "error": "NotFound",
+  "message": "Endpoint not found",
+  "statusCode": 404,
+  "correlationId": "req_yzab567"
+}
+```
+
+**原因**: 请求的端点不存在
+
+**解决方案**:
+1. 检查 URL 拼写是否正确
+2. 确认使用正确的 HTTP 方法
+3. 参考 [API 概览](/api-reference/introduction) 查看所有可用端点
+
+### 409 Conflict
+
+```json
+{
+  "error": "Conflict",
+  "message": "A conversation with this ID already exists",
+  "statusCode": 409,
+  "correlationId": "req_cdef890"
+}
+```
+
+**原因**: 资源冲突,如重复的会话 ID
+
+**解决方案**: 使用不同的标识符或检查是否已存在
+
+### 429 Rate Limit Exceeded
+
+```json
+{
+  "error": "RateLimitExceeded",
+  "message": "Rate limit exceeded. Please retry after 10 seconds.",
+  "statusCode": 429,
+  "retryAfter": 10,
+  "correlationId": "req_ghij123"
+}
+```
+
+**原因**: 超过 API 调用速率限制
+
+**解决方案**:
+1. 实现指数退避重试策略
+2. 减少并发请求数
+3. 在 `retryAfter` 秒后重试
+4. 联系销售团队提升限额
+
+**响应头**:
+```http
+Retry-After: 10
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1609459200
+```
+
+### 500 Internal Server Error
+
+```json
+{
+  "error": "InternalServerError",
+  "message": "An unexpected error occurred",
+  "statusCode": 500,
+  "correlationId": "req_klmn456"
+}
+```
+
+**原因**: 服务器内部错误
+
+**解决方案**:
+1. 使用 `correlationId` 联系技术支持
+2. 稍后重试请求
+3. 检查服务状态页面
+
+### 503 Service Unavailable
+
+```json
+{
+  "error": "ServiceUnavailable",
+  "message": "Service temporarily unavailable. Please try again later.",
+  "statusCode": 503,
+  "correlationId": "req_opqr789"
+}
+```
+
+**原因**: 服务暂时不可用(维护、过载等)
+
+**解决方案**:
+1. 等待几分钟后重试
+2. 实现重试机制
+3. 查看服务状态页面
+
+## 特殊错误场景
+
+### 上下文策略错误
+
+使用 `contextStrategy: "error"` 时,缺少上下文会返回:
+
+```json
+{
+  "error": "BadRequest",
+  "message": "Missing required context: configData",
+  "details": {
+    "missingContext": ["configData"],
+    "tools": ["zhipin_reply_generator"],
+    "strategy": "error"
+  },
+  "statusCode": 400,
+  "correlationId": "req_stuv012"
+}
+```
+
+### 验证模式报告
+
+使用 `validateOnly: true` 时返回验证报告而非错误:
+
+```json
+{
+  "success": true,
+  "data": {
+    "valid": false,
+    "errors": [
+      {
+        "tool": "zhipin_reply_generator",
+        "missingContext": ["configData", "replyPrompts"]
+      }
+    ]
+  }
+}
+```
+
+### 流式输出错误
+
+流式响应中的错误格式:
+
+```
+data: {"type":"error","error":"RateLimitExceeded","message":"Rate limit exceeded"}
+
+data: [DONE]
+```
+
+## 错误处理最佳实践
+
+<AccordionGroup>
+  <Accordion title="记录 correlationId">
+    每个错误响应都包含 `correlationId`,便于问题排查:
+
+    ```javascript
+    try {
+      const response = await fetch(url, options);
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error(`Error [${data.correlationId}]:`, data.message);
+        // 记录到日志系统
+      }
+    } catch (error) {
+      console.error('Request failed:', error);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="实现重试机制">
+    对于 429 和 5xx 错误,实现重试:
+
+    ```javascript
+    async function fetchWithRetry(url, options, maxRetries = 3) {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          const response = await fetch(url, options);
+
+          if (response.status === 429) {
+            const retryAfter = parseInt(response.headers.get('Retry-After') || '5');
+            await sleep(retryAfter * 1000);
+            continue;
+          }
+
+          if (response.status >= 500) {
+            if (i === maxRetries - 1) throw new Error('Server error');
+            await sleep(Math.pow(2, i) * 1000); // 指数退避
+            continue;
+          }
+
+          return response;
+        } catch (error) {
+          if (i === maxRetries - 1) throw error;
+        }
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="区分错误类型">
+    根据状态码采取不同的处理策略:
+
+    ```javascript
+    function handleError(error) {
+      switch (error.statusCode) {
+        case 401:
+          redirectToLogin(); // 重新认证
+          break;
+        case 403:
+          showPermissionError(); // 权限提示
+          break;
+        case 429:
+          scheduleRetry(error.retryAfter); // 限流重试
+          break;
+        case 500:
+        case 503:
+          retryWithBackoff(); // 服务器错误重试
+          break;
+        default:
+          showGenericError(error.message);
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="使用 validateOnly 预检">
+    在正式调用前验证参数:
+
+    ```javascript
+    // 先验证
+    const validateResponse = await fetch(url, {
+      ...options,
+      body: JSON.stringify({ ...payload, validateOnly: true })
+    });
+
+    const validation = await validateResponse.json();
+
+    if (!validation.data.valid) {
+      console.error('Validation failed:', validation.data.errors);
+      return; // 不发起实际请求
+    }
+
+    // 验证通过,发起实际请求
+    const response = await fetch(url, options);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="错误处理指南"
+    icon="shield"
+    href="/features/error-handling"
+  >
+    查看完整的错误处理示例代码
+  </Card>
+
+  <Card
+    title="调试技巧"
+    icon="bug"
+    href="/best-practices/debugging"
+  >
+    学习高效的调试方法
+  </Card>
+</CardGroup>

@@ -1,97 +1,166 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "简介"
+description: "欢迎使用花卷智能体 API - 强大、灵活的 AI 对话服务"
 ---
 
-## Setting up
+## 什么是花卷智能体？
 
-Get your documentation site up and running in minutes.
+花卷智能体（HuaJune Agent）是一个企业级 AI 对话服务平台，为开发者提供强大的对话能力、工具调用和流式输出等功能。通过简单的 RESTful API，你可以快速集成先进的 AI 能力到你的应用中。
+
+## 核心特性
+
+<CardGroup cols={2}>
+  <Card
+    title="多模型支持"
+    icon="brain"
+    href="/concepts/models"
+  >
+    支持 Claude、GPT、Qwen 等多种主流大模型，灵活选择最适合你业务场景的模型
+  </Card>
+  <Card
+    title="工具调用"
+    icon="wrench"
+    href="/features/tool-calling"
+  >
+    内置多种工具能力，支持 Bash 执行、BOSS直聘回复生成等业务工具
+  </Card>
+  <Card
+    title="流式输出"
+    icon="stream"
+    href="/features/streaming"
+  >
+    支持 Server-Sent Events (SSE) 流式响应，实现打字机效果的实时对话体验
+  </Card>
+  <Card
+    title="智能剪裁"
+    icon="scissors"
+    href="/features/message-pruning"
+  >
+    自动管理上下文长度，优化 token 使用，降低成本的同时保持对话质量
+  </Card>
+</CardGroup>
+
+## 快速开始
+
+只需三步，即可开始使用花卷智能体 API：
+
+<Steps>
+  <Step title="获取 API Key">
+    在控制台注册并获取你的 API Key
+  </Step>
+  <Step title="发起第一个请求">
+    使用我们的快速开始指南，5 分钟内完成首次 API 调用
+  </Step>
+  <Step title="探索更多功能">
+    了解工具调用、流式输出等高级功能，构建更强大的应用
+  </Step>
+</Steps>
 
 <Card
-  title="Start here"
+  title="5 分钟快速开始"
   icon="rocket"
   href="/quickstart"
   horizontal
 >
-  Follow our three step quickstart guide.
+  查看完整的快速开始指南，立即体验花卷智能体 API
 </Card>
 
-## Make it yours
+## 主要功能
 
-Design a docs site that looks great and empowers your users.
+<Accordion title="文本对话">
+  基础的 AI 对话能力，支持多轮对话、上下文理解，适用于客服机器人、智能助手等场景。
 
-<Columns cols={2}>
+  [了解更多 →](/features/text-chat)
+</Accordion>
+
+<Accordion title="工具调用">
+  让 AI 能够调用外部工具完成复杂任务，如执行代码、生成招聘回复、查询数据等。
+
+  [了解更多 →](/features/tool-calling)
+</Accordion>
+
+<Accordion title="流式输出">
+  实时返回 AI 生成的内容，提供流畅的用户体验，类似 ChatGPT 的打字机效果。
+
+  [了解更多 →](/features/streaming)
+</Accordion>
+
+<Accordion title="消息剪裁">
+  自动管理对话历史长度，在保持对话连贯性的同时优化 token 消耗。
+
+  [了解更多 →](/features/message-pruning)
+</Accordion>
+
+## 适用场景
+
+<CardGroup cols={3}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="智能客服"
+    icon="headset"
   >
-    Edit your docs locally and preview them in real time.
+    构建 7×24 小时在线的智能客服系统
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
+    title="招聘助手"
+    icon="user-tie"
   >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+    自动化候选人沟通与筛选流程
   </Card>
   <Card
-    title="API documentation"
-    icon="terminal"
+    title="内容生成"
+    icon="pen-fancy"
+  >
+    生成营销文案、产品描述等各类内容
+  </Card>
+  <Card
+    title="代码助手"
+    icon="code"
+  >
+    提供代码补全、解释和调试建议
+  </Card>
+  <Card
+    title="数据分析"
+    icon="chart-line"
+  >
+    通过自然语言查询和分析数据
+  </Card>
+  <Card
+    title="自动化工作流"
+    icon="gears"
+  >
+    集成到业务流程中实现智能自动化
+  </Card>
+</CardGroup>
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="快速开始"
+    icon="play"
+    href="/quickstart"
+  >
+    5 分钟快速体验 API
+  </Card>
+  <Card
+    title="API 参考"
+    icon="book"
     href="/api-reference/introduction"
   >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+    查看完整的 API 文档
   </Card>
   <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
+    title="认证说明"
+    icon="key"
+    href="/authentication"
   >
-    Add sample code to demonstrate how to use your product.
+    了解如何进行 API 认证
   </Card>
   <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
+    title="核心概念"
+    icon="lightbulb"
+    href="/concepts/models"
   >
-    Display images and other media.
+    深入理解系统核心概念
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
-
-## Need inspiration?
-
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+</CardGroup>

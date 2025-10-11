@@ -1,0 +1,124 @@
+---
+title: "模型"
+description: "了解花卷智能体支持的 AI 模型及如何选择"
+---
+
+## 支持的模型
+
+花卷智能体支持多种主流大语言模型，涵盖不同的性能级别和价格区间。
+
+### 查看可用模型
+
+使用 `GET /api/v1/models` 端点查询你账户可用的所有模型：
+
+```bash
+curl -X GET https://huajune.duliday.com/api/v1/models \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+响应示例：
+
+```json
+{
+  "success": true,
+  "data": {
+    "models": [
+      {
+        "id": "anthropic/claude-3-7-sonnet-20250219",
+        "name": "Claude 3.7 Sonnet",
+        "categories": ["chat", "general"]
+      },
+      {
+        "id": "openai/gpt-4o",
+        "name": "GPT-4o",
+        "categories": ["chat", "vision"]
+      }
+    ]
+  }
+}
+```
+
+## 模型 ID 格式
+
+模型 ID 采用 `provider/model` 格式：
+
+- `provider`: 模型提供商（如 `anthropic`, `openai`, `qwen`）
+- `model`: 具体模型名称
+
+示例：
+
+- `anthropic/claude-3-7-sonnet-20250219`
+- `openai/gpt-4o`
+- `qwen/qwen-max-latest`
+
+<Tip>某些提供商支持多级路径，如 `openrouter/openai/gpt-4o`</Tip>
+
+## 如何选择模型
+
+<CardGroup cols={2}>
+  <Card title="Claude 3.7 Sonnet" icon="brain">
+    **推荐场景**：通用对话、代码生成、复杂推理
+    
+    - 性能优秀，平衡价格
+    - 支持长上下文
+    - 适合生产环境
+  </Card>
+
+{" "}
+<Card title="GPT-4o" icon="sparkles">
+  **推荐场景**：多模态任务、视觉理解 - 支持图像输入 - 响应速度快 - 通用能力强
+</Card>
+
+{" "}
+<Card title="Qwen Max" icon="bolt">
+  **推荐场景**：中文场景、成本敏感应用 - 中文能力优秀 - 性价比高 - 响应速度快
+</Card>
+
+  <Card title="Qwen Plus" icon="zap">
+    **推荐场景**：高频调用、开发测试
+    
+    - 价格实惠
+    - 适合大批量调用
+    - 响应速度快
+  </Card>
+</CardGroup>
+
+## 在请求中指定模型
+
+在 `POST /api/v1/chat` 请求中使用 `model` 参数：
+
+```json
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好"
+    }
+  ]
+}
+```
+
+<Warning>
+  如果指定的模型不在你的许可列表中，API 将返回 `403 Forbidden` 错误。
+</Warning>
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="工具系统"
+    icon="wrench"
+    href="/concepts/tools"
+  >
+    了解如何让模型使用工具
+  </Card>
+
+  <Card
+    title="消息格式"
+    icon="message"
+    href="/concepts/messages"
+  >
+    理解消息的结构和格式
+  </Card>
+</CardGroup>

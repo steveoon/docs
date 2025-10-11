@@ -1,0 +1,56 @@
+---
+title: "认证与鉴权"
+description: "了解如何安全地使用花卷智能体 API"
+---
+
+## 认证机制
+
+花卷智能体 API 使用 **Bearer Token** 认证机制。每个 API 请求都需要在 HTTP 请求头中携带有效的 API Key。
+
+### 基本用法
+
+在每个 API 请求的 `Authorization` 头中添加你的 API Key：
+
+```http
+Authorization: Bearer YOUR_API_KEY
+```
+
+<Warning>
+  所有 API 请求都必须通过 HTTPS 协议发送，以确保 API Key 的安全传输。
+</Warning>
+
+## 获取 API Key
+
+<Steps>
+  <Step title="登录控制台">
+    访问 [花卷智能体控制台](https://console.huajune.com)
+  </Step>
+
+  <Step title="创建 API Key">
+    在"API Keys"页面点击"创建新密钥"按钮
+  </Step>
+
+  <Step title="安全保存">
+    复制生成的 API Key 并妥善保存
+  </Step>
+</Steps>
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="快速开始"
+    icon="rocket"
+    href="/quickstart"
+  >
+    开始你的第一个 API 调用
+  </Card>
+
+  <Card
+    title="核心概念"
+    icon="book"
+    href="/concepts/models"
+  >
+    了解模型、工具等核心概念
+  </Card>
+</CardGroup>

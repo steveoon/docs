@@ -1,0 +1,552 @@
+---
+title: "POST /chat"
+description: "发起对话,支持流式输出、工具调用等功能"
+---
+
+## 端点
+
+```
+POST https://huajune.duliday.com/api/v1/chat
+```
+
+## 认证
+
+```http
+Authorization: Bearer YOUR_API_KEY
+```
+
+## 请求参数
+
+### 必需参数
+
+<ParamField body="model" type="string" required>
+  AI 模型标识符,格式为 `provider/model`
+
+  示例: `anthropic/claude-3-7-sonnet-20250219`
+</ParamField>
+
+<ParamField body="messages" type="array" required>
+  对话消息数组,每个消息包含 `role` 和 `content` 字段
+
+  ```json
+  [
+    { "role": "user", "content": "你好" },
+    { "role": "assistant", "content": "你好！" }
+  ]
+  ```
+</ParamField>
+
+### 可选参数
+
+<ParamField body="systemPrompt" type="string">
+  自定义系统提示词,用于定义 AI 的角色和行为
+
+  示例: `"你是一个专业的Python编程导师"`
+</ParamField>
+
+<ParamField body="stream" type="boolean" default="false">
+  是否启用流式输出
+
+  - `true`: 使用 Server-Sent Events (SSE) 实时返回
+  - `false`: 一次性返回完整响应
+</ParamField>
+
+<ParamField body="allowedTools" type="array">
+  允许 AI 使用的工具列表
+
+  ```json
+  ["bash", "zhipin_reply_generator"]
+  ```
+
+  使用 `GET /api/v1/tools` 查看可用工具
+</ParamField>
+
+<ParamField body="context" type="object">
+  为工具提供的全局上下文数据
+
+  ```json
+  {
+    "configData": { ... },
+    "replyPrompts": { ... }
+  }
+  ```
+</ParamField>
+
+<ParamField body="toolContext" type="object">
+  工具级别的上下文配置,会覆盖全局 `context`
+
+  ```json
+  {
+    "zhipin_reply_generator": {
+      "replyPrompts": { "custom_key": "value" }
+    }
+  }
+  ```
+</ParamField>
+
+<ParamField body="contextStrategy" type="string" default="error">
+  上下文缺失时的处理策略
+
+  - `error`: 返回 400 错误,列出缺失字段
+  - `skip`: 跳过无法实例化的工具
+  - `report`: 仅返回验证报告
+</ParamField>
+
+<ParamField body="prune" type="boolean" default="false">
+  是否启用消息剪裁以优化 Token 使用
+</ParamField>
+
+<ParamField body="pruneOptions" type="object">
+  消息剪裁配置选项
+
+  ```json
+  {
+    "maxOutputTokens": 15000,
+    "targetTokens": 8000,
+    "preserveRecentMessages": 2
+  }
+  ```
+</ParamField>
+
+<ParamField body="validateOnly" type="boolean" default="false">
+  仅验证参数,不执行实际对话
+
+  用于检查工具配置是否正确
+</ParamField>
+
+## 响应格式
+
+### 非流式响应 (stream: false)
+
+<ResponseField name="success" type="boolean">
+  请求是否成功
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  响应数据对象
+
+  <Expandable title="data 对象属性">
+    <ResponseField name="messages" type="array">
+      AI 生成的消息数组
+
+      ```json
+      [
+        {
+          "id": "msg_abc123",
+          "role": "assistant",
+          "parts": [
+            {
+              "type": "text",
+              "text": "你好！我是一个AI助手..."
+            }
+          ]
+        }
+      ]
+      ```
+    </ResponseField>
+
+    <ResponseField name="usage" type="object">
+      Token 使用统计
+
+      ```json
+      {
+        "inputTokens": 15,
+        "outputTokens": 45,
+        "totalTokens": 60
+      }
+      ```
+    </ResponseField>
+
+    <ResponseField name="correlationId" type="string">
+      请求关联 ID,用于问题排查
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### 流式响应 (stream: true)
+
+使用 Server-Sent Events (SSE) 格式,事件类型包括:
+
+#### content_block_start
+```json
+{
+  "type": "content_block_start",
+  "index": 0,
+  "content_block": {
+    "type": "text",
+    "text": ""
+  }
+}
+```
+
+#### content_block_delta
+```json
+{
+  "type": "content_block_delta",
+  "index": 0,
+  "delta": {
+    "type": "text_delta",
+    "text": "你好"
+  }
+}
+```
+
+#### content_block_stop
+```json
+{
+  "type": "content_block_stop",
+  "index": 0
+}
+```
+
+#### message_stop
+```json
+{
+  "type": "message_stop",
+  "usage": {
+    "inputTokens": 15,
+    "outputTokens": 45
+  }
+}
+```
+
+最后会发送 `data: [DONE]` 表示流结束。
+
+## 响应头
+
+| 头部                   | 说明                          |
+| ---------------------- | ----------------------------- |
+| X-Message-Pruned       | 是否进行了消息剪裁 (true/false) |
+| X-Correlation-Id       | 请求关联 ID                   |
+| Content-Type           | 流式: `text/event-stream`<br/>非流式: `application/json` |
+
+## 示例
+
+<CodeGroup>
+
+```bash cURL (基础对话)
+curl -X POST https://huajune.duliday.com/api/v1/chat \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-3-7-sonnet-20250219",
+    "messages": [
+      {
+        "role": "user",
+        "content": "你好，请介绍一下你自己"
+      }
+    ],
+    "stream": false
+  }'
+```
+
+```bash cURL (流式输出)
+curl -N -X POST https://huajune.duliday.com/api/v1/chat \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "anthropic/claude-3-7-sonnet-20250219",
+    "messages": [
+      {
+        "role": "user",
+        "content": "介绍一下 Python"
+      }
+    ],
+    "stream": true
+  }'
+```
+
+```javascript JavaScript (非流式)
+const response = await fetch('https://huajune.duliday.com/api/v1/chat', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    model: 'anthropic/claude-3-7-sonnet-20250219',
+    systemPrompt: '你是一个友好的AI助手',
+    messages: [
+      { role: 'user', content: '你好！' }
+    ],
+    stream: false
+  })
+});
+
+const data = await response.json();
+console.log(data.data.messages[0].parts[0].text);
+```
+
+```javascript JavaScript (流式)
+const response = await fetch('https://huajune.duliday.com/api/v1/chat', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    model: 'anthropic/claude-3-7-sonnet-20250219',
+    messages: [
+      { role: 'user', content: '讲个故事' }
+    ],
+    stream: true
+  })
+});
+
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  const chunk = decoder.decode(value);
+  const lines = chunk.split('\n').filter(line => line.trim());
+
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const data = line.slice(6);
+      if (data === '[DONE]') break;
+
+      const event = JSON.parse(data);
+      if (event.type === 'content_block_delta') {
+        process.stdout.write(event.delta.text);
+      }
+    }
+  }
+}
+```
+
+```python Python (非流式)
+import requests
+
+url = 'https://huajune.duliday.com/api/v1/chat'
+headers = {
+    'Authorization': f'Bearer {api_key}',
+    'Content-Type': 'application/json'
+}
+payload = {
+    'model': 'anthropic/claude-3-7-sonnet-20250219',
+    'systemPrompt': '你是一个友好的AI助手',
+    'messages': [
+        {'role': 'user', 'content': '你好！'}
+    ],
+    'stream': False
+}
+
+response = requests.post(url, json=payload, headers=headers)
+data = response.json()
+print(data['data']['messages'][0]['parts'][0]['text'])
+```
+
+```python Python (流式)
+import requests
+import json
+
+url = 'https://huajune.duliday.com/api/v1/chat'
+headers = {
+    'Authorization': f'Bearer {api_key}',
+    'Content-Type': 'application/json'
+}
+payload = {
+    'model': 'anthropic/claude-3-7-sonnet-20250219',
+    'messages': [
+        {'role': 'user', 'content': '讲个故事'}
+    ],
+    'stream': True
+}
+
+response = requests.post(url, json=payload, headers=headers, stream=True)
+
+for line in response.iter_lines():
+    if line:
+        line = line.decode('utf-8')
+        if line.startswith('data: '):
+            data = line[6:]
+            if data == '[DONE]':
+                break
+
+            event = json.loads(data)
+            if event['type'] == 'content_block_delta':
+                print(event['delta']['text'], end='', flush=True)
+```
+
+```javascript JavaScript (工具调用)
+const response = await fetch('https://huajune.duliday.com/api/v1/chat', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    model: 'anthropic/claude-3-7-sonnet-20250219',
+    messages: [
+      { role: 'user', content: '查看当前目录' }
+    ],
+    allowedTools: ['bash'],
+    stream: false
+  })
+});
+
+const data = await response.json();
+console.log(data.data.messages[0]);
+```
+
+</CodeGroup>
+
+## 常见错误
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid or missing API key",
+  "statusCode": 401
+}
+```
+
+**解决方案**: 检查 API Key 是否正确
+
+### 403 Forbidden
+
+```json
+{
+  "error": "Forbidden",
+  "message": "Model not available with your API key",
+  "statusCode": 403
+}
+```
+
+**解决方案**: 使用 `GET /api/v1/models` 查看可用模型
+
+### 400 Bad Request - 缺少上下文
+
+```json
+{
+  "error": "BadRequest",
+  "message": "Missing required context: configData",
+  "details": {
+    "missingContext": ["configData"],
+    "tools": ["zhipin_reply_generator"]
+  },
+  "statusCode": 400
+}
+```
+
+**解决方案**: 在 `context` 中提供缺失的字段,或使用 `contextStrategy: "skip"`
+
+详见 [错误码表](/api-reference/error-codes)
+
+## 最佳实践
+
+<AccordionGroup>
+  <Accordion title="优化 Token 使用">
+    对于长对话,启用消息剪裁:
+
+    ```json
+    {
+      "prune": true,
+      "pruneOptions": {
+        "targetTokens": 8000,
+        "preserveRecentMessages": 3
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="流式输出用户体验">
+    在前端使用流式输出提供实时反馈:
+
+    ```javascript
+    // React 示例
+    const [text, setText] = useState('');
+
+    const streamChat = async () => {
+      const response = await fetch(url, { ...options, stream: true });
+      const reader = response.body.getReader();
+
+      // 逐步更新 UI
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        // 解析并更新 setText...
+      }
+    };
+    ```
+  </Accordion>
+
+  <Accordion title="验证工具配置">
+    使用 `validateOnly` 预检配置:
+
+    ```javascript
+    const validation = await fetch(url, {
+      ...options,
+      body: JSON.stringify({ ...payload, validateOnly: true })
+    });
+
+    if (!validation.data.valid) {
+      console.error('配置错误:', validation.data.errors);
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="多轮对话管理">
+    保持完整的对话历史:
+
+    ```javascript
+    const conversationHistory = [];
+
+    // 添加用户消息
+    conversationHistory.push({
+      role: 'user',
+      content: userInput
+    });
+
+    // 发送请求
+    const response = await chat(conversationHistory);
+
+    // 添加AI响应
+    conversationHistory.push({
+      role: 'assistant',
+      content: response.data.messages[0].parts[0].text
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## 相关文档
+
+<CardGroup cols={2}>
+  <Card
+    title="流式输出"
+    icon="stream"
+    href="/features/streaming"
+  >
+    实现流式对话的完整指南
+  </Card>
+
+  <Card
+    title="工具调用"
+    icon="wrench"
+    href="/features/tool-calling"
+  >
+    让 AI 使用工具完成任务
+  </Card>
+
+  <Card
+    title="消息剪裁"
+    icon="scissors"
+    href="/features/message-pruning"
+  >
+    优化长对话的 Token 使用
+  </Card>
+
+  <Card
+    title="错误处理"
+    icon="triangle-exclamation"
+    href="/features/error-handling"
+  >
+    错误处理最佳实践
+  </Card>
+</CardGroup>

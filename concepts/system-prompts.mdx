@@ -1,0 +1,130 @@
+---
+title: "系统提示词"
+description: "配置 AI 的行为和角色定位"
+---
+
+## 什么是系统提示词？
+
+系统提示词（System Prompt）用于定义 AI 的角色、行为准则和回复风格。它在对话开始前设置，影响 AI 的所有回复。
+
+## 三种配置方式
+
+### 1. 直接指定（优先级最高）
+
+使用 `systemPrompt` 字段直接传入：
+
+```json
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [...],
+  "systemPrompt": "你是一个专业的技术顾问，擅长解答编程相关问题。"
+}
+```
+
+### 2. 使用 promptType
+
+通过 `promptType` 引用预定义的提示词模板：
+
+```json
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [...],
+  "promptType": "bossZhipinSystemPrompt",
+  "context": {
+    "systemPrompts": {
+      "bossZhipinSystemPrompt": "你是BOSS直聘招聘助手..."
+    }
+  }
+}
+```
+
+### 3. 使用默认值
+
+如果既不指定 `systemPrompt` 也不指定 `promptType`，使用默认值：
+
+```
+"You are a helpful AI assistant."
+```
+
+## 可用的 promptType
+
+使用 `GET /api/v1/prompt-types` 查询所有可用的提示词类型：
+
+```bash
+curl -X GET https://huajune.duliday.com/api/v1/prompt-types \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+响应示例：
+
+```json
+{
+  "success": true,
+  "data": {
+    "promptTypes": [
+      {
+        "id": "bossZhipinSystemPrompt",
+        "description": "BOSS直聘招聘助手系统提示词"
+      },
+      {
+        "id": "generalComputerSystemPrompt",
+        "description": "通用计算机助手系统提示词"
+      }
+    ]
+  }
+}
+```
+
+## 优先级规则
+
+系统提示词的优先级顺序：
+
+1. **直接指定** (`systemPrompt` 字段)
+2. **类型查找** (`promptType` 在 `context.systemPrompts` 中查找)
+3. **默认值** ("You are a helpful AI assistant.")
+
+## 最佳实践
+
+<AccordionGroup>
+  <Accordion title="明确角色定位">
+    清晰定义 AI 的身份和职责：
+    
+    ```
+    "你是一个专业的Python编程导师，擅长用简单易懂的语言解释复杂的编程概念。"
+    ```
+  </Accordion>
+
+{" "}
+<Accordion title="设置行为准则">
+  明确 AI 应该遵循的规则： ``` "回复时请遵循：1) 使用中文 2) 回答简洁 3)
+  提供代码示例" ```
+</Accordion>
+
+  <Accordion title="定义输出格式">
+    如需特定格式的输出，在提示词中说明：
+    
+    ```
+    "回复格式要求：使用Markdown，代码块使用语法高亮"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="上下文管理"
+    icon="gear"
+    href="/concepts/context"
+  >
+    了解完整的上下文配置
+  </Card>
+
+  <Card
+    title="文本对话"
+    icon="message"
+    href="/features/text-chat"
+  >
+    开始使用文本对话功能
+  </Card>
+</CardGroup>

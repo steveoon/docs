@@ -1,0 +1,215 @@
+---
+title: "性能优化"
+description: "优化 API 调用性能和成本"
+---
+
+## 优化策略概览
+
+<CardGroup cols={2}>
+  <Card title="消息剪裁" icon="scissors">
+    减少不必要的上下文
+  </Card>
+
+  <Card title="模型选择" icon="brain">
+    根据场景选择合适的模型
+  </Card>
+
+  <Card title="批量处理" icon="layer-group">
+    合并多个请求减少开销
+  </Card>
+
+  <Card title="缓存策略" icon="database">
+    缓存常见问题的答案
+  </Card>
+</CardGroup>
+
+## 1. 使用消息剪裁
+
+启用消息剪裁减少 Token 消耗：
+
+```json
+{
+  "prune": true,
+  "pruneOptions": {
+    "targetTokens": 8000,
+    "preserveRecentMessages": 3
+  }
+}
+```
+
+**预期收益**：Token 使用减少 40-70%
+
+## 2. 选择合适的模型
+
+根据任务复杂度选择模型：
+
+| 任务类型 | 推荐模型 | 性价比 |
+|---------|---------|--------|
+| 简单问答 | Qwen Plus | ⭐⭐⭐⭐⭐ |
+| 通用对话 | Claude 3.7 Sonnet | ⭐⭐⭐⭐ |
+| 复杂推理 | Claude 3.7 Sonnet | ⭐⭐⭐ |
+| 中文场景 | Qwen Max | ⭐⭐⭐⭐ |
+
+## 3. 实现请求缓存
+
+缓存常见问题的答案：
+
+```javascript
+const cache = new Map();
+
+async function cachedChat(message) {
+  const cacheKey = message.toLowerCase();
+
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey);
+  }
+
+  const response = await chat(message);
+  cache.set(cacheKey, response);
+
+  // 设置过期时间（1小时）
+  setTimeout(() => cache.delete(cacheKey), 3600000);
+
+  return response;
+}
+```
+
+## 4. 批量处理
+
+合并多个独立请求：
+
+```javascript
+// ❌ 不推荐：多次单独请求
+for (const question of questions) {
+  await chat(question);
+}
+
+// ✅ 推荐：合并为单次请求
+const combinedPrompt = questions
+  .map((q, i) => `问题${i+1}: ${q}`)
+  .join('\n');
+
+await chat(combinedPrompt);
+```
+
+## 5. 使用流式输出
+
+流式输出提升用户体验，且不增加成本：
+
+```json
+{
+  "stream": true
+}
+```
+
+**优势**：
+- 用户感知响应更快
+- 可以提前取消不需要的请求
+- Token 计费相同
+
+## 6. 精简系统提示词
+
+保持系统提示词简洁明了：
+
+```javascript
+// ❌ 过长的提示词
+const systemPrompt = `
+你是一个专业的AI助手。你需要遵循以下规则：
+1. 回答要准确
+2. 态度要友好
+3. 格式要规范
+...（200字）
+`;
+
+// ✅ 简洁的提示词
+const systemPrompt = "你是一个专业友好的AI助手，回答要准确、简洁。";
+```
+
+## 7. 合理使用工具
+
+仅在必要时启用工具：
+
+```javascript
+// 简单对话不需要工具
+const simpleChat = {
+  messages: [...],
+  // 不设置 allowedTools
+};
+
+// 需要执行操作时才启用
+const actionChat = {
+  messages: [...],
+  allowedTools: ['bash']
+};
+```
+
+## 8. 监控和分析
+
+跟踪关键指标：
+
+```javascript
+function logMetrics(response) {
+  const { inputTokens, outputTokens, totalTokens } = response.data.usage;
+
+  console.log({
+    timestamp: new Date().toISOString(),
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    cost: calculateCost(totalTokens)
+  });
+}
+```
+
+## 性能对比
+
+| 优化措施 | Token 节省 | 成本节省 | 实施难度 |
+|---------|-----------|---------|---------|
+| 消息剪裁 | 40-70% | 40-70% | 简单 |
+| 模型降级 | 0% | 30-50% | 简单 |
+| 请求缓存 | 变化 | 10-30% | 中等 |
+| 精简提示词 | 5-10% | 5-10% | 简单 |
+| 批量处理 | 20-40% | 20-40% | 中等 |
+
+## 成本估算
+
+典型场景的月成本估算（基于 Claude 3.7 Sonnet）：
+
+| 场景 | 日请求数 | 平均 Tokens | 月成本 | 优化后 |
+|------|---------|------------|--------|--------|
+| 小型应用 | 1,000 | 1,500 | $45 | $20 |
+| 中型应用 | 10,000 | 2,000 | $600 | $250 |
+| 大型应用 | 100,000 | 1,800 | $5,400 | $2,200 |
+
+## 最佳实践清单
+
+<Accordion title="性能优化清单">
+- [ ] 启用消息剪裁
+- [ ] 根据场景选择合适的模型
+- [ ] 实现请求结果缓存
+- [ ] 使用流式输出提升体验
+- [ ] 精简系统提示词
+- [ ] 仅在需要时启用工具
+- [ ] 监控 Token 使用情况
+- [ ] 定期审查和优化
+</Accordion>
+
+## 下一步
+
+<CardGroup cols={2}>
+  <Card
+    title="消息剪裁"
+    icon="scissors"
+    href="/features/message-pruning"
+  >
+    详细了解消息剪裁功能
+  </Card>
+
+  <Card
+    title="调试技巧"
+    icon="bug"
+    href="/best-practices/debugging"
+  >
+    学习调试和问题排查
+  </Card>
+</CardGroup>

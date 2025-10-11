@@ -1,33 +1,176 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: "API 概览"
+description: "花卷智能体 API 参考文档"
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+## 欢迎使用花卷智能体 API
 
-## Welcome
+花卷智能体提供了一套简洁、强大的 RESTful API,让你轻松集成 AI 对话能力到你的应用中。
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+## Base URL
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+```
+https://huajune.duliday.com/api/v1
+```
 
-## Authentication
+## 认证方式
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+所有 API 请求都需要在 HTTP 请求头中携带 Bearer Token:
+
+```http
+Authorization: Bearer YOUR_API_KEY
+```
+
+详见 [认证文档](/authentication)
+
+## 可用端点
+
+<CardGroup cols={2}>
+  <Card
+    title="POST /chat"
+    icon="message"
+    href="/api-reference/endpoint/chat"
+  >
+    发起对话,支持流式输出、工具调用等高级功能
+  </Card>
+
+  <Card
+    title="GET /models"
+    icon="brain"
+    href="/api-reference/endpoint/models"
+  >
+    获取可用的 AI 模型列表
+  </Card>
+
+  <Card
+    title="GET /tools"
+    icon="wrench"
+    href="/api-reference/endpoint/tools"
+  >
+    获取可用工具及其上下文要求
+  </Card>
+
+  <Card
+    title="GET /prompt-types"
+    icon="list"
+    href="/api-reference/endpoint/prompt-types"
+  >
+    获取系统提示词类型枚举
+  </Card>
+
+  <Card
+    title="GET /config-schema"
+    icon="gear"
+    href="/api-reference/endpoint/config-schema"
+  >
+    获取配置字段的 Schema 定义
+  </Card>
+</CardGroup>
+
+## API 特性
+
+<AccordionGroup>
+  <Accordion title="流式输出">
+    支持 Server-Sent Events (SSE) 实时返回生成内容,提供打字机效果
+  </Accordion>
+
+  <Accordion title="工具调用">
+    AI 可调用 bash、zhipin_reply_generator 等工具完成复杂任务
+  </Accordion>
+
+  <Accordion title="消息剪裁">
+    智能管理对话历史,自动优化 Token 使用,降低成本
+  </Accordion>
+
+  <Accordion title="上下文管理">
+    灵活的上下文注入机制,支持工具级和全局级配置
+  </Accordion>
+
+  <Accordion title="多模型支持">
+    支持 Claude、GPT-4、Qwen 等多种主流大语言模型
+  </Accordion>
+</AccordionGroup>
+
+## 数据格式
+
+### 请求格式
+
+所有 POST 请求使用 JSON 格式:
+
+```http
+Content-Type: application/json
+```
+
+### 响应格式
+
+成功响应:
 
 ```json
-"security": [
-  {
-    "bearerAuth": []
+{
+  "success": true,
+  "data": {
+    // 响应数据
   }
-]
+}
 ```
+
+错误响应:
+
+```json
+{
+  "error": "ErrorType",
+  "message": "Human-readable error message",
+  "statusCode": 400,
+  "correlationId": "req_abc123"
+}
+```
+
+详见 [错误处理](/features/error-handling)
+
+## 速率限制
+
+API 调用受速率限制保护,具体限额取决于你的订阅计划。超出限制时会返回 `429 Too Many Requests` 错误。
+
+响应头中包含限流信息:
+
+```http
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 99
+X-RateLimit-Reset: 1609459200
+```
+
+## SDK 和示例
+
+<CardGroup cols={2}>
+  <Card
+    title="快速开始"
+    icon="rocket"
+    href="/quickstart"
+  >
+    5 分钟快速上手指南
+  </Card>
+
+  <Card
+    title="完整示例"
+    icon="code"
+    href="/features/text-chat"
+  >
+    查看 JavaScript 和 Python 完整示例
+  </Card>
+</CardGroup>
+
+## 下一步
+
+<Steps>
+  <Step title="了解请求/响应格式">
+    查看 [请求与响应](/api-reference/request-response) 详细说明
+  </Step>
+
+  <Step title="选择端点">
+    从左侧菜单选择你需要的 API 端点
+  </Step>
+
+  <Step title="查看错误码">
+    参考 [错误码表](/api-reference/error-codes) 处理异常情况
+  </Step>
+</Steps>

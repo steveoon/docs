@@ -1,122 +1,100 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "花卷智能体",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#F59E0B",
+    "light": "#FCD34D",
+    "dark": "#D97706"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "指南",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "快速开始",
+            "pages": ["index", "quickstart", "authentication"]
+          },
+          {
+            "group": "核心概念",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "concepts/models",
+              "concepts/tools",
+              "concepts/messages",
+              "concepts/system-prompts",
+              "concepts/context"
             ]
           },
           {
-            "group": "Customization",
+            "group": "功能指南",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "features/text-chat",
+              "features/tool-calling",
+              "features/streaming",
+              "features/message-pruning",
+              "features/error-handling"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "最佳实践",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "best-practices/performance",
+              "best-practices/debugging",
+              "best-practices/faq"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API 参考",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "API 概览",
             "pages": [
-              "api-reference/introduction"
+              "api-reference/introduction",
+              "api-reference/request-response",
+              "api-reference/error-codes"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "端点详解",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api-reference/endpoint/chat",
+              "api-reference/endpoint/models",
+              "api-reference/endpoint/tools",
+              "api-reference/endpoint/prompt-types",
+              "api-reference/endpoint/config-schema"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
+    ]
   },
   "logo": {
-    "light": "/logo/light.svg",
+    "light": "/logo/Huajune_light.png",
     "dark": "/logo/dark.svg"
   },
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "label": "支持",
+        "href": "mailto:support@huajune.com"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "控制台",
+      "href": "https://console.huajune.com"
     }
   },
   "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+    "options": ["copy", "view"]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/your-org/huajune-agent"
     }
   }
 }

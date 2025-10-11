@@ -1,0 +1,356 @@
+---
+title: "GET /models"
+description: "获取可用的 AI 模型列表"
+---
+
+## 端点
+
+```
+GET https://huajune.duliday.com/api/v1/models
+```
+
+## 认证
+
+```http
+Authorization: Bearer YOUR_API_KEY
+```
+
+## 请求参数
+
+此端点不需要任何参数。
+
+## 响应格式
+
+<ResponseField name="success" type="boolean">
+  请求是否成功
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  响应数据对象
+
+  <Expandable title="data 对象属性">
+    <ResponseField name="models" type="array">
+      可用模型数组,每个模型包含以下字段:
+
+      <Expandable title="model 对象属性">
+        <ResponseField name="id" type="string">
+          模型唯一标识符,格式为 `provider/model`
+
+          示例: `anthropic/claude-3-7-sonnet-20250219`
+        </ResponseField>
+
+        <ResponseField name="name" type="string">
+          模型显示名称
+
+          示例: `Claude 3.7 Sonnet`
+        </ResponseField>
+
+        <ResponseField name="categories" type="array">
+          模型类别标签
+
+          常见类别:
+          - `chat`: 对话模型
+          - `vision`: 支持视觉输入
+          - `general`: 通用模型
+          - `code`: 代码生成
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## 响应示例
+
+```json
+{
+  "success": true,
+  "data": {
+    "models": [
+      {
+        "id": "anthropic/claude-3-7-sonnet-20250219",
+        "name": "Claude 3.7 Sonnet",
+        "categories": ["chat", "general"]
+      },
+      {
+        "id": "openai/gpt-4o",
+        "name": "GPT-4o",
+        "categories": ["chat", "vision"]
+      },
+      {
+        "id": "qwen/qwen-max-latest",
+        "name": "Qwen Max",
+        "categories": ["chat", "general"]
+      },
+      {
+        "id": "qwen/qwen-plus-latest",
+        "name": "Qwen Plus",
+        "categories": ["chat", "general"]
+      }
+    ]
+  }
+}
+```
+
+## 示例代码
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET https://huajune.duliday.com/api/v1/models \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+```javascript JavaScript
+const response = await fetch('https://huajune.duliday.com/api/v1/models', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`
+  }
+});
+
+const data = await response.json();
+const models = data.data.models;
+
+console.log('可用模型:');
+models.forEach(model => {
+  console.log(`- ${model.name} (${model.id})`);
+});
+```
+
+```python Python
+import requests
+
+url = 'https://huajune.duliday.com/api/v1/models'
+headers = {
+    'Authorization': f'Bearer {api_key}'
+}
+
+response = requests.get(url, headers=headers)
+data = response.json()
+models = data['data']['models']
+
+print('可用模型:')
+for model in models:
+    print(f"- {model['name']} ({model['id']})")
+```
+
+```javascript JavaScript (过滤模型)
+const response = await fetch('https://huajune.duliday.com/api/v1/models', {
+  headers: { 'Authorization': `Bearer ${apiKey}` }
+});
+
+const data = await response.json();
+
+// 只获取支持视觉的模型
+const visionModels = data.data.models.filter(model =>
+  model.categories.includes('vision')
+);
+
+console.log('支持视觉的模型:', visionModels);
+```
+
+```python Python (过滤模型)
+import requests
+
+response = requests.get(
+    'https://huajune.duliday.com/api/v1/models',
+    headers={'Authorization': f'Bearer {api_key}'}
+)
+
+data = response.json()
+
+# 只获取 Claude 模型
+claude_models = [
+    model for model in data['data']['models']
+    if model['id'].startswith('anthropic/')
+]
+
+print('Claude 模型:', claude_models)
+```
+
+</CodeGroup>
+
+## 使用场景
+
+<AccordionGroup>
+  <Accordion title="动态模型选择">
+    根据用户许可动态展示可用模型:
+
+    ```javascript
+    async function getAvailableModels() {
+      const response = await fetch('/api/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const data = await response.json();
+      return data.data.models;
+    }
+
+    // 在 UI 中展示模型选择器
+    const models = await getAvailableModels();
+    const selectOptions = models.map(m => ({
+      value: m.id,
+      label: m.name
+    }));
+    ```
+  </Accordion>
+
+  <Accordion title="模型可用性检查">
+    在发起对话前检查模型是否可用:
+
+    ```javascript
+    async function isModelAvailable(modelId) {
+      const response = await fetch('/api/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const data = await response.json();
+
+      return data.data.models.some(m => m.id === modelId);
+    }
+
+    const modelId = 'anthropic/claude-3-7-sonnet-20250219';
+    if (!await isModelAvailable(modelId)) {
+      console.error('模型不可用');
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="按类别筛选">
+    根据需求筛选特定类型的模型:
+
+    ```javascript
+    async function getModelsByCategory(category) {
+      const response = await fetch('/api/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const data = await response.json();
+
+      return data.data.models.filter(model =>
+        model.categories.includes(category)
+      );
+    }
+
+    // 获取所有支持视觉的模型
+    const visionModels = await getModelsByCategory('vision');
+    ```
+  </Accordion>
+
+  <Accordion title="缓存模型列表">
+    缓存模型列表以减少 API 调用:
+
+    ```javascript
+    class ModelCache {
+      constructor() {
+        this.models = null;
+        this.lastFetch = null;
+        this.ttl = 3600000; // 1小时
+      }
+
+      async getModels() {
+        const now = Date.now();
+
+        if (!this.models || now - this.lastFetch > this.ttl) {
+          const response = await fetch('/api/v1/models', {
+            headers: { 'Authorization': `Bearer ${apiKey}` }
+          });
+          const data = await response.json();
+
+          this.models = data.data.models;
+          this.lastFetch = now;
+        }
+
+        return this.models;
+      }
+    }
+
+    const cache = new ModelCache();
+    const models = await cache.getModels();
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## 模型 ID 格式
+
+模型 ID 采用 `provider/model` 格式:
+
+| Provider    | 示例 ID                                  | 说明           |
+| ----------- | ---------------------------------------- | -------------- |
+| `anthropic` | `anthropic/claude-3-7-sonnet-20250219`   | Claude 模型    |
+| `openai`    | `openai/gpt-4o`                          | OpenAI 模型    |
+| `qwen`      | `qwen/qwen-max-latest`                   | 通义千问模型   |
+| 其他        | `openrouter/openai/gpt-4o`               | 多级路径格式   |
+
+<Tip>
+  某些提供商支持多级路径,如 `openrouter/provider/model`
+</Tip>
+
+## 常见错误
+
+### 401 Unauthorized
+
+```json
+{
+  "error": "Unauthorized",
+  "message": "Invalid or missing API key",
+  "statusCode": 401
+}
+```
+
+**解决方案**: 检查 API Key 是否正确,确认 Authorization 头格式为 `Bearer YOUR_API_KEY`
+
+详见 [错误码表](/api-reference/error-codes)
+
+## 最佳实践
+
+<CardGroup cols={2}>
+  <Card title="缓存结果" icon="database">
+    模型列表变化不频繁,建议缓存 1-24 小时
+  </Card>
+
+  <Card title="错误处理" icon="shield">
+    处理网络错误和认证失败,提供降级方案
+  </Card>
+
+  <Card title="UI 集成" icon="palette">
+    在模型选择器中展示 `name` 字段,存储 `id` 字段
+  </Card>
+
+  <Card title="权限检查" icon="lock">
+    根据返回的模型列表控制用户可选范围
+  </Card>
+</CardGroup>
+
+## 相关文档
+
+<CardGroup cols={2}>
+  <Card
+    title="模型概念"
+    icon="brain"
+    href="/concepts/models"
+  >
+    了解不同模型的特性和适用场景
+  </Card>
+
+  <Card
+    title="Chat API"
+    icon="message"
+    href="/api-reference/endpoint/chat"
+  >
+    使用模型 ID 发起对话
+  </Card>
+
+  <Card
+    title="认证说明"
+    icon="key"
+    href="/authentication"
+  >
+    了解 API 认证机制
+  </Card>
+
+  <Card
+    title="错误处理"
+    icon="triangle-exclamation"
+    href="/features/error-handling"
+  >
+    处理 API 错误的最佳实践
+  </Card>
+</CardGroup>
