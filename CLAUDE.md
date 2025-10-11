@@ -1,0 +1,114 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+This is a Mintlify-based documentation site. Mintlify is a modern documentation platform that uses MDX (Markdown + JSX) files for content and a `docs.json` configuration file for site structure and settings.
+
+## Development Workflow
+
+### Local Development
+```bash
+# Install Mintlify CLI globally (requires Node.js 19+)
+npm i -g mint
+
+# Start local preview server (runs on port 3000 by default)
+mint dev
+
+# Use custom port if needed
+mint dev --port 3333
+
+# Update CLI to latest version
+mint update
+
+# Validate all links in documentation
+mint broken-links
+```
+
+### Local Preview
+- Development server runs at `http://localhost:3000`
+- Changes auto-reload in the browser
+- The `docs.json` file must exist in the directory where you run `mint dev`
+
+## Architecture & Structure
+
+### Configuration System
+- **`docs.json`**: Central configuration file controlling:
+  - Site metadata (name, theme, colors, favicon)
+  - Navigation structure (tabs, groups, pages)
+  - Logo configuration (light/dark modes)
+  - Navbar and footer settings
+  - Contextual menu options (copy, view, AI integrations)
+
+### Content Organization
+Documentation is organized into tabbed sections defined in `docs.json`:
+
+1. **Guides Tab**:
+   - Getting started (index, quickstart, development)
+   - Customization (settings, navigation)
+   - Writing content (markdown, code, images, reusable-snippets)
+   - AI tools (cursor, claude-code, windsurf)
+
+2. **API Reference Tab**:
+   - API introduction
+   - Endpoint examples (GET, POST, DELETE, webhooks)
+   - OpenAPI specification (`api-reference/openapi.json`)
+
+### File Types
+- **`.mdx` files**: Content pages using MDX (Markdown with React components)
+- **`docs.json`**: Site configuration
+- **`openapi.json`**: OpenAPI specification for auto-generated API documentation
+- **`/snippets`**: Reusable content snippets that can be included across multiple pages
+- **`/images` and `/logo`**: Static assets
+
+## Content Editing Guidelines
+
+### Navigation Updates
+To add/remove pages or change navigation:
+1. Edit the `navigation` object in `docs.json`
+2. Add page file path (without `.mdx` extension) to appropriate `pages` array
+3. The file path in `docs.json` corresponds to the actual file location
+   - Example: `"index"` → `index.mdx`
+   - Example: `"essentials/settings"` → `essentials/settings.mdx`
+
+### Creating New Pages
+1. Create `.mdx` file in appropriate directory
+2. Add frontmatter with `title` and `description`
+3. Reference the page (without extension) in `docs.json` navigation
+4. Use Mintlify components (Card, Accordion, Tip, Note, etc.) for rich content
+
+### API Documentation
+- Edit `api-reference/openapi.json` to update API specifications
+- Mintlify auto-generates API documentation from this OpenAPI spec
+- API endpoint pages in `api-reference/endpoint/` demonstrate the documentation structure
+
+## Deployment
+
+- Changes are automatically deployed via Mintlify GitHub app
+- Install the app from: https://dashboard.mintlify.com/settings/organization/github-app
+- Pushing to the default branch triggers automatic production deployment
+- Successful deployments show "All checks have passed" message
+
+## Troubleshooting
+
+### Preview Server Issues
+```bash
+# If preview isn't running, update CLI
+mint update
+
+# If page loads as 404, ensure you're in directory with docs.json
+cd /path/to/docs
+
+# macOS ARM (M1/M2) sharp module error
+npm remove -g mint
+# Upgrade to Node v19+
+npm i -g mint
+```
+
+### Unknown Errors
+Delete the Mintlify cache and restart:
+```bash
+rm -rf ~/.mintlify
+mint dev
+```
