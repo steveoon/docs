@@ -51,17 +51,26 @@ Token 使用统计：
 
 ```
 event: usage
-data: {"type":"usage.final","promptTokens":123,"completionTokens":45,"totalTokens":168}
+data: {"type":"usage.final","inputTokens":123,"outputTokens":45,"totalTokens":168}
 ```
 
-### done 事件
+### finish 事件
 
-流结束标志：
+消息完成标志：
 
 ```
-event: done
-data: {"type":"done"}
+data: {"type":"finish"}
 ```
+
+### 流结束标记
+
+流结束时会发送特殊的 `[DONE]` 标记：
+
+```
+data: [DONE]
+```
+
+**注意**：`[DONE]` 是字面量文本，不是 JSON 对象。
 
 ### error 事件
 
@@ -102,10 +111,21 @@ while (true) {
 
   for (const line of lines) {
     if (line.startsWith("data: ")) {
-      const data = JSON.parse(line.slice(6));
+      const data = line.slice(6);
 
-      if (data.type === "text.delta") {
-        process.stdout.write(data.delta); // 实时输出文本
+      // 检查流结束标记
+      if (data === "[DONE]") {
+        break;
+      }
+
+      try {
+        const event = JSON.parse(data);
+
+        if (event.type === "text.delta") {
+          process.stdout.write(event.delta); // 实时输出文本
+        }
+      } catch (e) {
+        // 忽略无法解析的行
       }
     }
   }
@@ -135,10 +155,19 @@ with requests.post(url, json=payload, headers=headers, stream=True) as response:
             decoded = line.decode('utf-8')
 
             if decoded.startswith('data: '):
-                data = json.loads(decoded[6:])
+                data = decoded[6:]
 
-                if data['type'] == 'text.delta':
-                    print(data['delta'], end='', flush=True)
+                # 检查流结束标记
+                if data == '[DONE]':
+                    break
+
+                try:
+                    event = json.loads(data)
+
+                    if event['type'] == 'text.delta':
+                        print(event['delta'], end='', flush=True)
+                except json.JSONDecodeError:
+                    pass  # 忽略无法解析的行
 ```
 
 </CodeGroup>
@@ -191,14 +220,25 @@ function ChatBox() {
 
       for (const line of lines) {
         if (line.startsWith("data: ")) {
-          const data = JSON.parse(line.slice(6));
+          const data = line.slice(6);
 
-          if (data.type === "text.delta") {
-            setMessages((prev) => {
-              const newMessages = [...prev];
-              newMessages[newMessages.length - 1].content += data.delta;
-              return newMessages;
-            });
+          // 检查流结束标记
+          if (data === "[DONE]") {
+            break;
+          }
+
+          try {
+            const event = JSON.parse(data);
+
+            if (event.type === "text.delta") {
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1].content += event.delta;
+                return newMessages;
+              });
+            }
+          } catch (e) {
+            // 忽略无法解析的行
           }
         }
       }

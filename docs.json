@@ -85,8 +85,8 @@
     ],
     "primary": {
       "type": "button",
-      "label": "控制台",
-      "href": "https://console.huajune.com"
+      "label": "获取 API Key",
+      "href": "https://wolian.cc/platform/clients-management"
     }
   },
   "contextual": {

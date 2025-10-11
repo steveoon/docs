@@ -1,13 +1,48 @@
 ---
 title: "简介"
-description: "欢迎使用花卷智能体 API - 强大、灵活的 AI 对话服务"
+description: "欢迎使用花卷智能体 API - 专为蓝领智能招募打造的 AI 对话服务"
 ---
 
 ## 什么是花卷智能体？
 
-花卷智能体（HuaJune Agent）是一个企业级 AI 对话服务平台，为开发者提供强大的对话能力、工具调用和流式输出等功能。通过简单的 RESTful API，你可以快速集成先进的 AI 能力到你的应用中。
+花卷智能体（HuaJune Agent）是专为**蓝领智能招募**打造的 AI 对话服务平台。通过简单的 RESTful API，你可以快速为招聘业务集成强大的 AI 能力，实现候选人沟通自动化、招聘流程智能化。
 
-## 核心特性
+### 🎯 为招聘场景深度定制
+
+花卷内置了蓝领招聘业务所需的各类工具，开箱即用：
+
+<CardGroup cols={2}>
+  <Card title="预约面试" icon="calendar-check">
+    自动安排面试时间，发送提醒通知
+  </Card>
+  <Card title="岗位信息查询" icon="briefcase">
+    智能解答岗位相关问题，提供详细信息
+  </Card>
+  <Card title="订单查询" icon="file-invoice">
+    查询招聘订单状态和进度
+  </Card>
+  <Card title="订单分析" icon="chart-bar">
+    分析招聘数据，生成业务洞察
+  </Card>
+</CardGroup>
+
+### 💬 智能回复，零配置上手
+
+**最大亮点**：无需任何额外配置，直接调用 API 即可获得针对蓝领招聘场景优化的智能回复。
+
+系统自动理解候选人的咨询意图，并生成专业回复：
+
+- 📋 **岗位咨询**：工作内容、任职要求、发展空间
+- 💰 **薪资说明**：薪资结构、福利待遇、绩效奖金
+- 🕐 **排班解释**：工作时间、班次安排、休息制度
+- 📍 **地点介绍**：工作地点、交通路线、住宿安排
+- 🤖 **7×24 响应**：随时为候选人提供即时、准确的回复
+
+<Tip>
+  开发者只需传入候选人消息，花卷会自动调用合适的工具、匹配最佳回复策略，无需手动配置业务规则。
+</Tip>
+
+## 技术特性
 
 <CardGroup cols={2}>
   <Card
@@ -15,28 +50,28 @@ description: "欢迎使用花卷智能体 API - 强大、灵活的 AI 对话服�
     icon="brain"
     href="/concepts/models"
   >
-    支持 Claude、GPT、Qwen 等多种主流大模型，灵活选择最适合你业务场景的模型
-  </Card>
-  <Card
-    title="工具调用"
-    icon="wrench"
-    href="/features/tool-calling"
-  >
-    内置多种工具能力，支持 Bash 执行、BOSS直聘回复生成等业务工具
+    支持 Claude、GPT、Qwen 等主流大模型，可根据场景选择最优模型
   </Card>
   <Card
     title="流式输出"
     icon="stream"
     href="/features/streaming"
   >
-    支持 Server-Sent Events (SSE) 流式响应，实现打字机效果的实时对话体验
+    Server-Sent Events (SSE) 流式响应，打造流畅的实时对话体验
   </Card>
   <Card
     title="智能剪裁"
     icon="scissors"
     href="/features/message-pruning"
   >
-    自动管理上下文长度，优化 token 使用，降低成本的同时保持对话质量
+    自动管理上下文长度，优化 token 使用，降低 API 调用成本
+  </Card>
+  <Card
+    title="灵活扩展"
+    icon="puzzle-piece"
+    href="/features/tool-calling"
+  >
+    开放的工具系统，支持自定义业务工具集成
   </Card>
 </CardGroup>
 
@@ -46,7 +81,7 @@ description: "欢迎使用花卷智能体 API - 强大、灵活的 AI 对话服�
 
 <Steps>
   <Step title="获取 API Key">
-    在控制台注册并获取你的 API Key
+    在 [Wolian AI 平台](https://wolian.cc/platform/clients-management) 注册并获取已激活的 API Key
   </Step>
   <Step title="发起第一个请求">
     使用我们的快速开始指南，5 分钟内完成首次 API 调用
@@ -65,70 +100,72 @@ description: "欢迎使用花卷智能体 API - 强大、灵活的 AI 对话服�
   查看完整的快速开始指南，立即体验花卷智能体 API
 </Card>
 
-## 主要功能
+## 核心能力
 
-<Accordion title="文本对话">
-  基础的 AI 对话能力，支持多轮对话、上下文理解，适用于客服机器人、智能助手等场景。
+<AccordionGroup>
+  <Accordion title="智能对话" icon="comments">
+    支持多轮对话、上下文理解，针对蓝领招聘场景优化的对话能力，自动识别候选人意图并生成专业回复。
 
-  [了解更多 →](/features/text-chat)
-</Accordion>
+    [查看文本对话文档 →](/features/text-chat)
+  </Accordion>
 
-<Accordion title="工具调用">
-  让 AI 能够调用外部工具完成复杂任务，如执行代码、生成招聘回复、查询数据等。
+  <Accordion title="招聘工具集成" icon="toolbox">
+    内置预约面试、岗位查询、订单管理等招聘业务工具，AI 可根据对话内容自动调用合适的工具。
 
-  [了解更多 →](/features/tool-calling)
-</Accordion>
+    [查看工具调用文档 →](/features/tool-calling)
+  </Accordion>
 
-<Accordion title="流式输出">
-  实时返回 AI 生成的内容，提供流畅的用户体验，类似 ChatGPT 的打字机效果。
+  <Accordion title="实时流式响应" icon="bolt">
+    Server-Sent Events (SSE) 流式输出，实时返回生成内容，为候选人提供类似真人对话的流畅体验。
 
-  [了解更多 →](/features/streaming)
-</Accordion>
+    [查看流式输出文档 →](/features/streaming)
+  </Accordion>
 
-<Accordion title="消息剪裁">
-  自动管理对话历史长度，在保持对话连贯性的同时优化 token 消耗。
+  <Accordion title="智能成本优化" icon="piggy-bank">
+    自动剪裁对话历史，在保持对话质量的同时显著降低 Token 消耗和 API 调用成本。
 
-  [了解更多 →](/features/message-pruning)
-</Accordion>
+    [查看消息剪裁文档 →](/features/message-pruning)
+  </Accordion>
+</AccordionGroup>
 
-## 适用场景
+## 典型应用场景
 
 <CardGroup cols={3}>
   <Card
-    title="智能客服"
-    icon="headset"
+    title="候选人自动应答"
+    icon="message-bot"
   >
-    构建 7×24 小时在线的智能客服系统
+    7×24 小时自动回复候选人咨询，解答岗位、薪资、排班等问题
   </Card>
   <Card
-    title="招聘助手"
-    icon="user-tie"
+    title="面试智能预约"
+    icon="calendar-days"
   >
-    自动化候选人沟通与筛选流程
+    自动安排面试时间，发送提醒，减少人工协调成本
   </Card>
   <Card
-    title="内容生成"
-    icon="pen-fancy"
+    title="岗位信息推荐"
+    icon="briefcase"
   >
-    生成营销文案、产品描述等各类内容
+    根据候选人需求智能推荐匹配岗位，提高转化率
   </Card>
   <Card
-    title="代码助手"
-    icon="code"
+    title="招聘进度查询"
+    icon="list-check"
   >
-    提供代码补全、解释和调试建议
+    实时查询面试进度、入职状态等信息
   </Card>
   <Card
-    title="数据分析"
+    title="订单数据分析"
     icon="chart-line"
   >
-    通过自然语言查询和分析数据
+    分析招聘订单数据，生成业务报表和洞察
   </Card>
   <Card
-    title="自动化工作流"
-    icon="gears"
+    title="招聘流程自动化"
+    icon="arrows-rotate"
   >
-    集成到业务流程中实现智能自动化
+    将 AI 能力集成到现有招聘系统，实现端到端自动化
   </Card>
 </CardGroup>
 

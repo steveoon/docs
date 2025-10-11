@@ -22,18 +22,42 @@ Authorization: Bearer YOUR_API_KEY
 ## 获取 API Key
 
 <Steps>
-  <Step title="登录控制台">
-    访问 [花卷智能体控制台](https://console.huajune.com)
+  <Step title="访问 Wolian AI 平台">
+    前往 [客户端管理页面](https://wolian.cc/platform/clients-management)
   </Step>
 
-  <Step title="创建 API Key">
-    在"API Keys"页面点击"创建新密钥"按钮
+  <Step title="登录账户">
+    使用你的账户登录（与 `huajune.duliday.com` 使用相同的账户系统）
   </Step>
 
-  <Step title="安全保存">
-    复制生成的 API Key 并妥善保存
+  <Step title="创建客户端密钥">
+    点击页面中的 **"+ 创建"** 按钮，创建新的客户端和 API 密钥
+  </Step>
+
+  <Step title="激活密钥">
+    创建后，确保密钥状态显示为 **"已激活"**（绿色标识）
+
+    <Note>只有已激活的密钥才能用于 API 调用</Note>
+  </Step>
+
+  <Step title="复制密钥">
+    点击密钥旁边的复制按钮，复制完整的 API Key 并妥善保存
+
+    <Warning>密钥仅在创建时完整显示一次，请务必安全保存</Warning>
   </Step>
 </Steps>
+
+### API Key 格式
+
+API Key 通常为 32 位字符串，格式如下：
+
+```
+31ad14.******************
+fabbb5.******************
+20bd38.******************
+```
+
+前 6 位为密钥标识符，后续为加密字符串。
 
 ## 下一步
 
