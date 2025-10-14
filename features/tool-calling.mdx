@@ -7,30 +7,282 @@ description: "让 AI 调用外部工具完成复杂任务"
 
 工具调用允许 AI 模型执行外部功能，如运行代码、查询数据库、生成特定格式的内容等。
 
+<Note>
+  **重要**：花卷智能体 API 采用**服务端自动执行**模式，一次请求即可完成工具调用和结果处理，无需客户端多轮交互。
+</Note>
+
+## 工具调用流程
+
+花卷智能体 API 在服务端自动完成工具调用的完整流程：
+
+<Steps>
+  <Step title="1. 用户发起请求">
+    用户发送单次请求，包含 `allowedTools` 参数和必要的上下文：
+
+    ```json 用户请求 lines icon="paper-plane"
+    {
+      "model": "anthropic/claude-3-7-sonnet-20250219",
+      "messages": [
+        {
+          "role": "user",
+          "content": "候选人问：你们公司地址在哪？"
+        }
+      ],
+      "allowedTools": ["zhipin_reply_generator"],
+      "context": {
+        "preferredBrand": "蜀地源冒菜",
+        "configData": {
+          "city": "上海",
+          "brands": {
+            "蜀地源冒菜": {
+              "address": "上海市浦东新区XX路XX号"
+            }
+          }
+        },
+        "replyPrompts": {
+          "location_inquiry": "友好地告知公司地址，并询问是否需要路线指引"
+        }
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="2. 服务端自动处理">
+    服务端在一次请求中完成以下步骤：
+
+    1. **AI 决定**需要调用工具
+    2. **服务端执行**工具（zhipin_reply_generator 等）
+    3. **AI 理解**执行结果
+    4. **生成最终**回复
+
+    <Note>
+      所有工具调用都在服务端自动完成，最多可执行 30 步（包括多次工具调用）。
+    </Note>
+  </Step>
+
+  <Step title="3. 返回完整对话历史">
+    API 返回包含所有中间步骤的完整对话历史：
+
+    ```json API 响应 lines expandable highlight={7-23} icon="check-circle"
+    {
+      "success": true,
+      "data": {
+        "messages": [
+          {
+            "id": "msg_001",
+            "role": "assistant",
+            "parts": [
+              {
+                "type": "dynamic-tool",
+                "toolName": "zhipin_reply_generator",
+                "toolCallId": "call_abc123",
+                "state": "output-available",
+                "input": {
+                  "candidate_message": "你们公司地址在哪？",
+                  "brand": "蜀地源冒菜"
+                },
+                "output": {
+                  "reply": "您好！我们蜀地源冒菜位于上海市浦东新区XX路XX号，交通便利。如果您需要详细的路线指引，我很乐意为您提供。期待与您的面谈！😊"
+                }
+              }
+            ]
+          },
+          {
+            "id": "msg_002",
+            "role": "assistant",
+            "parts": [
+              {
+                "type": "text",
+                "text": "已为您生成专业的回复，内容包含了公司地址信息，并主动询问候选人是否需要路线指引。",
+                "state": "done"
+              }
+            ]
+          }
+        ],
+        "usage": {
+          "inputTokens": 280,
+          "outputTokens": 120,
+          "totalTokens": 400
+        },
+        "tools": {
+          "used": ["zhipin_reply_generator"],
+          "skipped": []
+        }
+      }
+    }
+    ```
+
+    <Tip>
+      响应中的 `messages` 数组包含完整的执行历史，包括工具调用的输入和输出。
+    </Tip>
+  </Step>
+</Steps>
+
+## dynamic-tool 结构说明
+
+工具调用使用 `dynamic-tool` 类型的 part，包含以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `type` | `string` | 固定值 `"dynamic-tool"` |
+| `toolName` | `string` | 工具名称（如 `zhipin_reply_generator`） |
+| `toolCallId` | `string` | AI 生成的唯一调用 ID |
+| `state` | `string` | 工具状态：`"output-available"`（已完成）或 `"input-available"`（仅输入） |
+| `input` | `object` | 工具输入参数（使用 snake_case 命名） |
+| `output` | `object` | 工具输出结果（仅当 `state: "output-available"` 时存在） |
+
+<Note>
+  所有工具输入参数使用 **snake_case** 命名约定（如 `candidate_message`），而非 camelCase。
+</Note>
+
+## 流程对比
+
+<Tabs>
+  <Tab title="服务端自动执行（花卷智能体 API）">
+    **当前采用的模式**：
+
+    ```
+    用户 → API (一次请求)
+        ↓
+    1. AI 决定需要调用工具
+        ↓
+    2. 服务端自动执行工具
+        ↓
+    3. AI 理解工具结果
+        ↓
+    4. 生成最终回复
+        ↓
+    API → 用户 (完整的对话历史)
+    ```
+
+    **优点**：
+    - ✅ 单次请求完成
+    - ✅ 无需客户端处理工具执行
+    - ✅ 自动重试和错误处理
+    - ✅ 完整的执行历史
+
+    **适用场景**：
+    - 服务端可以安全执行的工具（bash、数据库查询等）
+    - 不需要用户交互的自动化任务
+  </Tab>
+
+  <Tab title="客户端执行（其他 API 常见模式）">
+    **注意**：花卷智能体 API **不采用**这种模式
+
+    ```
+    用户 → API (请求 1)
+        ↓
+    API → 用户 (返回 tool-call)
+        ↓
+    用户执行工具
+        ↓
+    用户 → API (请求 2, 提交 tool-result)
+        ↓
+    API → 用户 (最终结果)
+    ```
+
+    **特点**：
+    - 需要多轮请求
+    - 客户端负责工具执行
+    - 适合需要用户确认的场景
+  </Tab>
+</Tabs>
+
 ## 基础用法
+
+### 简单示例
 
 通过 `allowedTools` 数组启用工具：
 
-```json
+```json 基础工具调用 lines icon="screwdriver-wrench"
 {
   "model": "anthropic/claude-3-7-sonnet-20250219",
   "messages": [
     {
       "role": "user",
-      "content": "帮我列出当前目录的文件"
+      "content": "候选人问：你们薪资待遇怎么样？"
     }
   ],
-  "allowedTools": ["bash"]
+  "allowedTools": ["zhipin_reply_generator"],
+  "context": {
+    "preferredBrand": "蜀地源冒菜",
+    "configData": {
+      "city": "上海",
+      "brands": {
+        "蜀地源冒菜": {
+          "templates": {
+            "salary_inquiry": ["基本工资4000-6000元，另有全勤奖、绩效奖等"]
+          }
+        }
+      }
+    },
+    "replyPrompts": {
+      "salary_inquiry": "用礼貌的语气说明薪资待遇，避免承诺无法兑现的条件"
+    }
+  }
 }
 ```
 
-## 工具示例
+<Note>
+  响应包含完整的执行过程，包括工具调用和智能生成的回复。
+</Note>
+
+### 多轮对话场景
+
+AI 可以在一次请求中理解上下文并调用工具：
+
+```json 多轮对话示例 lines expandable icon="comments"
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [
+    {
+      "role": "user",
+      "content": "候选人说：工资能谈吗？"
+    },
+    {
+      "role": "assistant",
+      "content": "当然可以，我们的薪资范围是4000-6000元。"
+    },
+    {
+      "role": "user",
+      "content": "候选人又问：那有五险一金吗？"
+    }
+  ],
+  "allowedTools": ["zhipin_reply_generator"],
+  "context": {
+    "preferredBrand": "蜀地源冒菜",
+    "configData": {
+      "brands": {
+        "蜀地源冒菜": {
+          "benefits": "五险一金、员工餐、交通补贴"
+        }
+      }
+    }
+  }
+}
+```
+
+<Tip>
+  服务端会根据对话历史和上下文，自动生成专业的招聘回复。
+</Tip>
+
+## 可用工具
+
+使用 `GET /api/v1/tools` 查看所有可用工具及其配置要求。
 
 ### Bash 工具
 
-执行 Bash 命令：
+执行 Bash 命令，**需要 E2B 沙盒环境**：
 
-```javascript
+<Warning>
+  **重要**：bash 工具需要在沙盒环境中运行。使用前需要：
+  1. 创建 E2B 沙盒客户端
+  2. 在 `context` 中提供 `sandboxId`
+
+  如果没有沙盒环境，工具将无法工作。
+</Warning>
+
+```javascript Bash 工具示例（需要沙盒） lines expandable icon="terminal"
 const response = await fetch("https://huajune.duliday.com/api/v1/chat", {
   method: "POST",
   headers: {
@@ -41,16 +293,25 @@ const response = await fetch("https://huajune.duliday.com/api/v1/chat", {
     model: "anthropic/claude-3-7-sonnet-20250219",
     messages: [{ role: "user", content: "检查系统磁盘使用情况" }],
     allowedTools: ["bash"],
-    stream: true,
+    context: {
+      sandboxId: "your_e2b_sandbox_id"  // ← 必需：E2B 沙盒 ID
+    }
   }),
 });
+
+const data = await response.json();
+console.log("完整对话历史:", data.messages);
 ```
+
+<Note>
+  **推荐**：对于一般的业务场景，建议使用 `zhipin_reply_generator` 等业务工具，而非 bash 工具。
+</Note>
 
 ### zhipin_reply_generator 工具
 
-生成 BOSS 直聘招聘回复：
+生成 BOSS 直聘招聘回复，需要 `configData` 和 `replyPrompts` 上下文：
 
-```json
+```json 招聘回复生成工具 lines expandable icon="message-bot"
 {
   "model": "anthropic/claude-3-7-sonnet-20250219",
   "messages": [
@@ -81,161 +342,439 @@ const response = await fetch("https://huajune.duliday.com/api/v1/chat", {
 
 ## 工具上下文
 
-某些工具需要额外的上下文信息。使用 `context` 和 `toolContext` 提供：
+某些工具需要额外的上下文信息：
 
-```json
-{
-  "allowedTools": ["zhipin_reply_generator"],
-  "context": {
-    "configData": { ... },
-    "replyPrompts": { ... }
-  },
-  "toolContext": {
-    "zhipin_reply_generator": {
-      "replyPrompts": {
-        "general_chat": "自定义回复模板"
+<AccordionGroup>
+  <Accordion title="全局上下文 - context" icon="globe">
+    使用 `context` 提供所有工具共享的上下文：
+
+    ```json 全局上下文 lines icon="globe"
+    {
+      "allowedTools": ["zhipin_reply_generator"],
+      "context": {
+        "configData": { ... },
+        "replyPrompts": { ... },
+        "preferredBrand": "蜀地源冒菜"
       }
     }
-  }
-}
-```
+    ```
+  </Accordion>
+
+  <Accordion title="工具级上下文 - toolContext" icon="layer-group">
+    使用 `toolContext` 为特定工具提供上下文，会覆盖全局 `context`：
+
+    ```json 工具级上下文 lines icon="layer-group"
+    {
+      "allowedTools": ["zhipin_reply_generator"],
+      "context": {
+        "replyPrompts": { "default": "默认模板" }
+      },
+      "toolContext": {
+        "zhipin_reply_generator": {
+          "replyPrompts": {
+            "general_chat": "自定义回复模板"  // 会覆盖全局配置
+          }
+        }
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+详见[上下文管理文档](/concepts/context)
 
 ## 上下文策略
 
-控制缺失上下文时的行为：
+控制工具上下文缺失时的行为：
 
-### error 策略（默认）
+<Tabs>
+  <Tab title="error（默认）">
+    缺少必需上下文时返回 400 错误：
 
-缺少必需上下文时返回错误：
+    ```json 错误响应 lines highlight={2-6} icon="triangle-exclamation"
+    {
+      "error": "BadRequest",
+      "message": "Missing required context: configData, replyPrompts",
+      "details": {
+        "missingContext": ["configData", "replyPrompts"],
+        "tools": ["zhipin_reply_generator"]
+      },
+      "statusCode": 400
+    }
+    ```
 
-```json
-{
-  "error": "BadRequest",
-  "message": "Missing required context: configData, replyPrompts",
-  "statusCode": 400
-}
-```
+    **适用场景**：确保工具配置正确，避免运行时错误
+  </Tab>
 
-### skip 策略
+  <Tab title="skip">
+    跳过无法初始化的工具，继续执行：
 
-跳过无法初始化的工具：
+    ```json 跳过工具 lines icon="forward"
+    {
+      "allowedTools": ["bash", "zhipin_reply_generator"],
+      "contextStrategy": "skip"
+    }
+    ```
 
-```json
-{
-  "allowedTools": ["bash", "zhipin_reply_generator"],
-  "contextStrategy": "skip"
-}
-```
+    响应头包含被跳过的工具：
+    ```text 响应头 icon="header"
+    X-Tools-Skipped: zhipin_reply_generator
+    ```
 
-响应头包含被跳过的工具：
+    **适用场景**：可选工具，部分失败不影响主流程
+  </Tab>
 
-```
-X-Tools-Skipped: zhipin_reply_generator
-```
+  <Tab title="report">
+    仅返回验证报告，不执行对话：
 
-### report 策略
+    ```json 验证模式 lines icon="clipboard-check"
+    {
+      "allowedTools": ["bash", "zhipin_reply_generator"],
+      "context": { ... },
+      "contextStrategy": "report"
+    }
+    ```
 
-仅返回验证报告：
+    或使用 `validateOnly`：
+    ```json validateOnly 参数 icon="clipboard-check"
+    {
+      "validateOnly": true
+    }
+    ```
 
-```json
-{
-  "contextStrategy": "report"
-}
-```
+    **适用场景**：预检工具配置，调试上下文问题
+  </Tab>
+</Tabs>
 
-或使用 `validateOnly`：
+## 流式输出中的工具事件
 
-```json
-{
-  "validateOnly": true
-}
-```
+使用 `stream: true` 时，可以实时监控工具调用过程：
 
-## 工具响应格式
+```text 工具事件示例 lines icon="stream"
+event: text
+data: {"type":"text.delta","delta":"我将"}
 
-流式输出中的工具调用事件：
+event: text
+data: {"type":"text.delta","delta":"为你生成专业的招聘回复"}
 
-```
 event: tool
-data: {"type":"tool.start","name":"bash","args":{"command":"ls -la"}}
+data: {"type":"tool.start","name":"zhipin_reply_generator","input":{"candidate_message":"你们薪资待遇怎么样？","brand":"蜀地源冒菜"}}
 
 event: tool
-data: {"type":"tool.output","name":"bash","output":"文件列表..."}
+data: {"type":"tool.output","name":"zhipin_reply_generator","output":"生成中..."}
+
+event: tool
+data: {"type":"tool.complete","name":"zhipin_reply_generator","state":"output-available","output":{"reply":"您好！我们的薪资范围是4000-6000元..."}}
+
+event: text
+data: {"type":"text.delta","delta":"已为您生成专业的招聘回复"}
+
+event: done
+data: {"type":"done"}
 ```
+
+<Note>
+  流式模式允许你实时看到 AI 的思考过程和工具执行进度，特别适合需要实时反馈的招聘场景。
+</Note>
+
+## 执行限制
+
+为了防止无限循环，工具调用有以下限制：
+
+| 限制项   | 值       | 说明                         |
+|---------|---------|------------------------------|
+| 最大步数 | 30      | 包括 AI 生成和工具调用的总步数 |
+| 超时     | 2 分钟  | 单次请求的最大执行时间        |
+
+<Warning>
+  如果达到步数限制或超时，API 会返回已执行的部分结果，并在响应中标记未完成状态。
+</Warning>
 
 ## 完整示例
 
-<CodeGroup>
+<Tabs>
+  <Tab title="JavaScript">
+    ```javascript JavaScript 完整示例 lines expandable icon="js"
+    async function generateRecruitmentReply() {
+      const response = await fetch("https://huajune.duliday.com/api/v1/chat", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "anthropic/claude-3-7-sonnet-20250219",
+          messages: [
+            {
+              role: "user",
+              content: "候选人问：你们公司福利待遇怎么样？包食宿吗？"
+            }
+          ],
+          allowedTools: ["zhipin_reply_generator"],
+          context: {
+            preferredBrand: "蜀地源冒菜",
+            configData: {
+              city: "上海",
+              brands: {
+                "蜀地源冒菜": {
+                  templates: {
+                    "benefits_inquiry": [
+                      "五险一金、员工餐、交通补贴",
+                      "提供员工宿舍（单人间）"
+                    ]
+                  }
+                }
+              }
+            },
+            replyPrompts: {
+              "benefits_inquiry": "详细介绍福利待遇，突出住宿优势"
+            }
+          },
+          stream: false,
+        }),
+      });
 
-```javascript JavaScript
-const response = await fetch("https://huajune.duliday.com/api/v1/chat", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${apiKey}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    model: "anthropic/claude-3-7-sonnet-20250219",
-    messages: [{ role: "user", content: "帮我创建一个test.txt文件" }],
-    allowedTools: ["bash"],
-    stream: true,
-  }),
-});
+      const data = await response.json();
 
-const reader = response.body.getReader();
-const decoder = new TextDecoder();
+      // 打印完整的对话历史
+      console.log("对话历史:");
+      data.data.messages.forEach((msg, idx) => {
+        console.log(`\n消息 ${idx + 1} (${msg.role}):`);
+        msg.parts.forEach(part => {
+          if (part.type === 'text') {
+            console.log(`  文本: ${part.text}`);
+          } else if (part.type === 'dynamic-tool') {
+            console.log(`  工具调用: ${part.toolName}`);
+            console.log(`  输入:`, part.input);
+            if (part.output) {
+              console.log(`  输出:`, part.output);
+            }
+          }
+        });
+      });
 
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-
-  const chunk = decoder.decode(value);
-  const lines = chunk.split("\n");
-
-  for (const line of lines) {
-    if (line.startsWith("event: tool")) {
-      console.log("工具调用:", line);
+      // 提取生成的招聘回复
+      const toolMessage = data.data.messages.find(msg =>
+        msg.parts.some(p => p.type === 'dynamic-tool')
+      );
+      const toolPart = toolMessage.parts.find(p => p.type === 'dynamic-tool');
+      const reply = toolPart.output.reply;
+      console.log("\n生成的招聘回复:", reply);
     }
-  }
-}
-```
 
-```python Python
-import requests
+    generateRecruitmentReply();
+    ```
+  </Tab>
 
-url = "https://huajune.duliday.com/api/v1/chat"
-headers = {
-    "Authorization": f"Bearer {api_key}",
-    "Content-Type": "application/json"
-}
-payload = {
-    "model": "anthropic/claude-3-7-sonnet-20250219",
-    "messages": [
-        {"role": "user", "content": "帮我创建一个test.txt文件"}
-    ],
-    "allowedTools": ["bash"],
-    "stream": True
-}
+  <Tab title="Python">
+    ```python Python 完整示例 lines expandable icon="python"
+    import requests
+    import json
 
-with requests.post(url, json=payload, headers=headers, stream=True) as response:
-    for line in response.iter_lines():
-        if line:
-            decoded = line.decode('utf-8')
-            if 'tool' in decoded:
-                print(f"工具调用: {decoded}")
-```
+    def generate_recruitment_reply():
+        url = "https://huajune.duliday.com/api/v1/chat"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "anthropic/claude-3-7-sonnet-20250219",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "候选人问：你们公司福利待遇怎么样？包食宿吗？"
+                }
+            ],
+            "allowedTools": ["zhipin_reply_generator"],
+            "context": {
+                "preferredBrand": "蜀地源冒菜",
+                "configData": {
+                    "city": "上海",
+                    "brands": {
+                        "蜀地源冒菜": {
+                            "templates": {
+                                "benefits_inquiry": [
+                                    "五险一金、员工餐、交通补贴",
+                                    "提供员工宿舍（单人间）"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "replyPrompts": {
+                    "benefits_inquiry": "详细介绍福利待遇，突出住宿优势"
+                }
+            },
+            "stream": False
+        }
 
-</CodeGroup>
+        response = requests.post(url, json=payload, headers=headers)
+        data = response.json()
+
+        # 打印完整的对话历史
+        print("对话历史:")
+        for idx, msg in enumerate(data['data']['messages']):
+            print(f"\n消息 {idx + 1} ({msg['role']}):")
+            for part in msg['parts']:
+                if part['type'] == 'text':
+                    print(f"  文本: {part['text']}")
+                elif part['type'] == 'dynamic-tool':
+                    print(f"  工具调用: {part['toolName']}")
+                    print(f"  输入:", part['input'])
+                    if 'output' in part:
+                        print(f"  输出:", part['output'])
+
+        # 提取生成的招聘回复
+        tool_msg = next(msg for msg in data['data']['messages']
+                        if any(p['type'] == 'dynamic-tool' for p in msg['parts']))
+        tool_part = next(p for p in tool_msg['parts'] if p['type'] == 'dynamic-tool')
+        reply = tool_part['output']['reply']
+        print("\n生成的招聘回复:", reply)
+
+    generate_recruitment_reply()
+    ```
+  </Tab>
+
+  <Tab title="cURL">
+    ```bash cURL 示例 lines expandable icon="terminal"
+    curl -X POST https://huajune.duliday.com/api/v1/chat \
+      -H "Authorization: Bearer YOUR_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "model": "anthropic/claude-3-7-sonnet-20250219",
+        "messages": [
+          {
+            "role": "user",
+            "content": "候选人问：工作时间怎么安排？"
+          }
+        ],
+        "allowedTools": ["zhipin_reply_generator"],
+        "context": {
+          "preferredBrand": "蜀地源冒菜",
+          "configData": {
+            "brands": {
+              "蜀地源冒菜": {
+                "templates": {
+                  "schedule_inquiry": ["早班8:00-17:00，晚班17:00-02:00，轮班制"]
+                }
+              }
+            }
+          },
+          "replyPrompts": {
+            "schedule_inquiry": "说明工作时间安排，强调合理性"
+          }
+        },
+        "stream": false
+      }' | jq '.data.messages'
+    ```
+  </Tab>
+</Tabs>
+
+## 常见问题
+
+<AccordionGroup>
+  <Accordion title="工具调用需要多次请求吗？" icon="circle-question">
+    **不需要**。花卷智能体 API 在服务端自动完成所有工具调用，单次请求即可获得最终结果。
+
+    **错误理解**：
+    ```
+    请求 1 → 获取 tool-call →
+    执行工具 →
+    请求 2 (提交 tool-result) → 最终结果
+    ```
+
+    **正确流程**：
+    ```
+    请求 1 → 服务端自动完成所有步骤 → 返回完整历史和最终结果
+    ```
+  </Accordion>
+
+  <Accordion title="如何查看工具执行的中间过程？" icon="circle-question">
+    使用 `stream: true` 可以实时监控工具调用：
+
+    ```javascript 流式监控 lines icon="stream"
+    const response = await fetch(url, {
+      body: JSON.stringify({ stream: true, ... })
+    });
+
+    const reader = response.body.getReader();
+    // 监听 event: tool 事件
+    ```
+
+    或者在非流式模式下，检查响应中的 `messages` 数组，包含所有中间步骤。
+  </Accordion>
+
+  <Accordion title="如何限制工具的执行次数？" icon="circle-question">
+    当前默认限制为 30 步。如果需要更严格的控制，可以：
+
+    1. 使用更明确的提示词，减少不必要的工具调用
+    2. 联系技术支持调整限制
+    3. 在 `context` 中提供更完整的信息，减少探索性调用
+  </Accordion>
+
+  <Accordion title="为什么我的工具没有被调用？" icon="circle-question">
+    可能的原因：
+
+    1. **工具未在 allowedTools 中**
+       ```json 正确配置 icon="check"
+       {
+         "allowedTools": ["zhipin_reply_generator"]
+       }
+       ```
+
+    2. **缺少必需的上下文**
+       ```json 完整配置示例 lines icon="check"
+       {
+         "allowedTools": ["zhipin_reply_generator"],
+         "context": {
+           "preferredBrand": "蜀地源冒菜",
+           "configData": { ... },    // ← 必需
+           "replyPrompts": { ... }   // ← 必需
+         }
+       }
+       ```
+
+       - 使用 `validateOnly: true` 预检配置
+       - 检查 `GET /api/v1/tools` 的 `requiredContext`
+
+    3. **AI 判断不需要调用**
+       - 尝试更明确的提示词
+       - 确认任务确实需要该工具
+
+    4. **bash 工具缺少沙盒环境**
+       - bash 工具需要 `context.sandboxId`
+       - 建议使用业务工具而非 bash
+  </Accordion>
+
+  <Accordion title="如何查看工具需要哪些上下文？" icon="circle-question">
+    使用 `GET /api/v1/tools` 端点查看每个工具的 `requiredContext`：
+
+    ```bash 查看工具要求 icon="terminal"
+    curl -X GET https://huajune.duliday.com/api/v1/tools \
+      -H "Authorization: Bearer YOUR_API_KEY"
+    ```
+
+    或使用 `validateOnly: true` 预检配置。
+  </Accordion>
+</AccordionGroup>
 
 ## 下一步
 
 <CardGroup cols={2}>
   <Card
+    title="消息格式"
+    icon="message"
+    href="/concepts/messages"
+  >
+    了解 tool-call 和 tool-result 的消息结构
+  </Card>
+
+  <Card
     title="工具系统"
     icon="book"
     href="/concepts/tools"
   >
-    深入了解工具系统
+    深入了解工具系统和工具定义
   </Card>
 
   <Card
@@ -243,6 +782,14 @@ with requests.post(url, json=payload, headers=headers, stream=True) as response:
     icon="gear"
     href="/concepts/context"
   >
-    理解工具上下文配置
+    理解工具上下文配置和验证
+  </Card>
+
+  <Card
+    title="流式输出"
+    icon="stream"
+    href="/features/streaming"
+  >
+    学习如何使用流式输出监控工具执行
   </Card>
 </CardGroup>

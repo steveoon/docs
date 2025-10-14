@@ -6,6 +6,7 @@
 
 - `test-non-stream.sh` - 非流式 API 调用测试（对应 quickstart.mdx 第二步）
 - `test-stream.sh` - 流式 API 调用测试（对应 quickstart.mdx 第四步）
+- `test-tool-calling.sh` - 工具调用 API 测试（对应 features/tool-calling.mdx）**[新增]**
 
 ## 快速使用
 
@@ -17,6 +18,9 @@
 
 # 测试流式输出
 ./test-stream.sh
+
+# 测试工具调用（新增）
+./test-tool-calling.sh
 ```
 
 默认配置：
@@ -66,6 +70,28 @@ API_URL="https://huajune.duliday.com" API_KEY="sk_xxx" ./test-stream.sh
 - `{"type":"text.delta","delta":"..."}` 文本增量事件
 - `{"type":"finish"}` 消息完成事件
 - `data: [DONE]` 流结束标记
+
+#### 工具调用 (test-tool-calling.sh) **[新增]**
+
+✅ 响应应包含：
+- `success: true` 字段
+- `data.messages` 数组包含工具调用历史
+- **`dynamic-tool` part** 而非分离的 `tool-call` 和 `tool-result`
+- `dynamic-tool` 结构包含：
+  - `type: "dynamic-tool"`（不是 `"tool-call"`）
+  - `toolName: "zhipin_reply_generator"`
+  - `toolCallId`: AI 生成的唯一 ID
+  - `state: "output-available"` 或 `"input-available"`
+  - `input`: 工具输入参数（**使用 snake_case 命名**）
+  - `output`: 工具输出结果（仅当 state 为 output-available 时）
+- `data.usage` 对象（Token 统计）
+- `data.tools` 对象（used 和 skipped 数组）
+
+❌ 响应不应包含（文档错误标记）：
+- `tool-call` 和 `tool-result` 分离的 parts
+- `args` 字段（应该是 `input`）
+- `role: "tool"` 的消息（应该都是 `role: "assistant"`）
+- camelCase 参数命名（应该是 snake_case）
 
 ## 故障排查
 

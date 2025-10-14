@@ -8,7 +8,7 @@
 
 # 配置项（可通过环境变量覆盖）
 API_URL="${API_URL:-http://localhost:3001}"
-API_KEY="${API_KEY:-31ad14.b2wPZkLb-Ci93tQy5pjjRQ.iAVKWqYQRMVMA-6x}"
+API_KEY="${API_KEY:-your_api_key_here}"
 
 echo "================================================"
 echo "测试：流式 API 调用"

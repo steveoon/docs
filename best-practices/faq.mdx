@@ -69,18 +69,25 @@ description: "花卷智能体 API 常见问题解答"
   </Accordion>
 
   <Accordion title="如何启用工具调用？">
-    在请求中添加 `allowedTools` 数组：
+    在请求中添加 `allowedTools` 数组，并提供必要的上下文：
 
-    ```json
+    ```json 启用工具示例 lines icon="wrench"
     {
       "model": "anthropic/claude-3-7-sonnet-20250219",
-      "messages": [...],
-      "allowedTools": ["bash", "zhipin_reply_generator"]
+      "messages": [
+        { "role": "user", "content": "候选人问：薪资待遇怎么样？" }
+      ],
+      "allowedTools": ["zhipin_reply_generator"],
+      "context": {
+        "preferredBrand": "蜀地源冒菜",
+        "configData": { ... },
+        "replyPrompts": { ... }
+      }
     }
     ```
 
     查看可用工具：
-    ```bash
+    ```bash 查看工具列表 icon="terminal"
     curl -X GET https://huajune.duliday.com/api/v1/tools \
       -H "Authorization: Bearer YOUR_API_KEY"
     ```
@@ -90,10 +97,93 @@ description: "花卷智能体 API 常见问题解答"
   <Accordion title="工具需要哪些上下文？">
     每个工具的 `requiredContext` 不同：
 
-    - **bash**: 无需额外上下文
-    - **zhipin_reply_generator**: 需要 `configData` 和 `replyPrompts`
+    - **zhipin_reply_generator**: 需要 `configData` 和 `replyPrompts` ✅ 推荐用于业务场景
+    - **bash**: 需要 `sandboxId`（E2B 沙盒环境）⚠️ 一般不推荐使用
+
+    <Tip>
+      **推荐**：使用 zhipin_reply_generator 等业务工具，它们更贴合实际的招聘场景，无需额外的沙盒环境配置。
+    </Tip>
 
     使用 `GET /api/v1/tools` 查看每个工具的具体要求。
+
+  </Accordion>
+
+  <Accordion title="工具调用是如何工作的？">
+    **花卷智能体 API 采用服务端自动执行模式**，一次请求即可完成所有工具调用。
+
+    **完整流程**：
+    1. **用户发送请求**：包含 `allowedTools` 参数和必要的上下文
+    2. **服务端自动处理**：
+       - AI 决定需要调用工具
+       - 服务端自动执行工具
+       - AI 理解执行结果
+       - 生成最终回复
+    3. **返回完整历史**：响应包含所有中间步骤（tool-call 和 tool-result）
+
+    ```json 请求示例 lines icon="paper-plane"
+    {
+      "model": "anthropic/claude-3-7-sonnet-20250219",
+      "messages": [
+        { "role": "user", "content": "候选人问：薪资待遇怎么样？" }
+      ],
+      "allowedTools": ["zhipin_reply_generator"],
+      "context": {
+        "preferredBrand": "蜀地源冒菜",
+        "configData": { ... },
+        "replyPrompts": { ... }
+      }
+    }
+    ```
+
+    <Tip>
+      **无需多轮请求**：服务端自动完成所有工具调用，最多可执行 30 步。
+    </Tip>
+
+    详细说明请参阅：
+    - [工具调用功能文档](/features/tool-calling)
+    - [消息格式](/concepts/messages)
+
+  </Accordion>
+
+  <Accordion title="如何查看工具执行的中间过程？">
+    工具在服务端自动执行，有两种方式查看执行过程：
+
+    **方式 1：使用流式输出（实时监控）**
+
+    ```javascript 流式监控 lines icon="stream"
+    const response = await fetch(url, {
+      body: JSON.stringify({
+        stream: true,
+        allowedTools: ["zhipin_reply_generator"],
+        context: { ... },
+        ...
+      })
+    });
+
+    const reader = response.body.getReader();
+    // 监听 event: tool 事件，实时查看工具调用过程
+    ```
+
+    **方式 2：检查响应中的 messages 数组（非流式）**
+
+    ```javascript 查看完整历史 lines icon="list"
+    const data = await response.json();
+
+    // 响应包含完整执行历史
+    data.data.messages.forEach(msg => {
+      msg.parts.forEach(part => {
+        if (part.type === 'dynamic-tool') {
+          console.log('工具调用:', part.toolName);
+          console.log('输入:', part.input);
+          if (part.output) {
+            console.log('输出:', part.output);
+          }
+        }
+      });
+    });
+    ```
+
+    详见[工具调用 - 流式输出](/features/tool-calling#流式输出中的工具事件)
 
   </Accordion>
 </AccordionGroup>
@@ -136,8 +226,9 @@ description: "花卷智能体 API 常见问题解答"
       "systemPrompt": "你是一个专业的Python导师"
     }
     ```
+    ✅ 最简单，直接覆盖 system prompt
 
-    **方式 2：使用 promptType**
+    **方式 2：使用 promptType + context.systemPrompts**
     ```json
     {
       "promptType": "bossZhipinSystemPrompt",
@@ -148,9 +239,43 @@ description: "花卷智能体 API 常见问题解答"
       }
     }
     ```
+    ✅ `promptType` 同时决定工具集和 system prompt
+
+    ✅ 适合多场景管理
 
     **方式 3：使用默认值**
-    不设置任何参数，使用 "You are a helpful AI assistant."
+    不设置任何参数，使用 `"You are a helpful AI assistant."`
+
+    详见[系统提示词文档](/concepts/system-prompts)
+
+  </Accordion>
+
+  <Accordion title="promptType 有什么作用？">
+    `promptType` 有两个独立的作用：
+
+    **1. 决定工具集（内置、强制）**
+    - 通过内置的 `PROMPT_TOOL_MAPPING` 自动启用对应工具
+    - 例如：`bossZhipinSystemPrompt` 自动启用招聘相关工具
+
+    **2. 查找 system prompt（可选）**
+    - 从 `context.systemPrompts[promptType]` 查找提示词文本
+    - 如果没有提供 `context.systemPrompts`，使用默认 system prompt
+
+    示例：
+    ```json
+    {
+      "promptType": "bossZhipinSystemPrompt"
+      // 效果：
+      // ✅ 启用招聘工具集
+      // ℹ️ 使用默认 system prompt（因为没有提供 context.systemPrompts）
+    }
+    ```
+
+    查询可用的 `promptType`：
+    ```bash
+    curl -X GET https://huajune.duliday.com/api/v1/prompt-types \
+      -H "Authorization: Bearer YOUR_API_KEY"
+    ```
 
   </Accordion>
 </AccordionGroup>

@@ -3,17 +3,50 @@ title: "系统提示词"
 description: "配置 AI 的行为和角色定位"
 ---
 
-## 什么是系统提示词？
+## 什么是系统提示词?
 
 系统提示词（System Prompt）用于定义 AI 的角色、行为准则和回复风格。它在对话开始前设置，影响 AI 的所有回复。
 
-## 三种配置方式
+## 什么是 promptType?
 
-### 1. 直接指定（优先级最高）
+`promptType` 是一个**预定义的场景标识符**，具有两个独立的作用：
 
-使用 `systemPrompt` 字段直接传入：
+### 1. 工具集映射（内置、强制）
 
-```json
+`promptType` 通过内置的 `PROMPT_TOOL_MAPPING` 决定该场景下 AI 可以使用哪些工具。
+
+**示例：**
+
+- `bossZhipinSystemPrompt` → 自动启用 `bash`、`feishu`、`wechat`、`computer` 等招聘场景工具
+- `generalComputerSystemPrompt` → 自动启用通用计算机工具
+
+<Note>
+  **重要**：工具集映射是内置的，由系统自动管理。即使你不提供
+  `context.systemPrompts`，`promptType` 仍然会决定可用工具。
+</Note>
+
+### 2. System Prompt 查找（可选、由调用方提供）
+
+如果你在 `context.systemPrompts` 中提供了对应的提示词文本，`promptType` 也会用作键名来查找 system prompt。
+
+```json promptType 查找 system prompt icon="key"
+{
+  "promptType": "bossZhipinSystemPrompt",
+  "context": {
+    "systemPrompts": {
+      "bossZhipinSystemPrompt": "你是BOSS直聘招聘助手，负责与候选人沟通岗位信息。"
+    }
+  }
+}
+```
+
+## System Prompt 配置方式
+
+### 方式 1：直接指定（优先级最高）
+
+使用 `systemPrompt` 字段直接传入，覆盖所有其他来源：
+
+```json 直接指定 systemPrompt highlight={4} icon="circle-1"
 {
   "model": "anthropic/claude-3-7-sonnet-20250219",
   "messages": [...],
@@ -21,43 +54,91 @@ description: "配置 AI 的行为和角色定位"
 }
 ```
 
-### 2. 使用 promptType
+<Tip>
+  **推荐**：如果你需要完全自定义 system prompt，直接使用 `systemPrompt`
+  参数最简单。
+</Tip>
 
-通过 `promptType` 引用预定义的提示词模板：
+### 方式 2：使用 promptType + context.systemPrompts
 
-```json
+通过 `promptType` 引用你在 `context.systemPrompts` 中定义的提示词模板：
+
+```json 使用 promptType + context.systemPrompts highlight={4,6-9} lines icon="circle-2"
 {
   "model": "anthropic/claude-3-7-sonnet-20250219",
   "messages": [...],
   "promptType": "bossZhipinSystemPrompt",
   "context": {
     "systemPrompts": {
-      "bossZhipinSystemPrompt": "你是BOSS直聘招聘助手..."
+      "bossZhipinSystemPrompt": "你是BOSS直聘招聘助手，负责与候选人沟通岗位信息。",
+      "generalComputerSystemPrompt": "你是一个通用AI助手，可以使用计算机工具。"
     }
   }
 }
 ```
 
-### 3. 使用默认值
+这种方式的优势：
 
-如果既不指定 `systemPrompt` 也不指定 `promptType`，使用默认值：
+- 可以管理多个提示词模板
+- `promptType` 同时决定工具集和 system prompt
+- 适合多租户、多场景应用
 
+### 方式 3：仅使用 promptType（仅启用工具）
+
+如果你只提供 `promptType` 而不提供 `context.systemPrompts`，系统会：
+
+- ✅ 根据 `promptType` 启用对应的工具集
+- ℹ️ System prompt 使用默认值：`"You are a helpful AI assistant."`
+
+```json 仅使用 promptType（启用工具集） highlight={4} icon="circle-3"
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [...],
+  "promptType": "bossZhipinSystemPrompt"
+  // 没有 context.systemPrompts，使用默认 system prompt
+  // 但仍会启用 bossZhipinSystemPrompt 对应的工具集
+}
 ```
-"You are a helpful AI assistant."
+
+### 方式 4：使用默认值
+
+如果既不指定 `systemPrompt` 也不指定 `promptType`：
+
+- System prompt: `"You are a helpful AI assistant."`
+- 可用工具：由 `allowedTools` 决定（如果未指定则无工具）
+
+## 优先级规则
+
+System Prompt 的选择遵循以下优先级：
+
+```text System Prompt 优先级顺序 icon="arrow-down-1-9"
+1️⃣ 直接指定的 systemPrompt 参数
+     ↓ （如果未指定）
+2️⃣ context.systemPrompts[promptType] 查找
+     ↓ （如果未找到或 promptType 未指定）
+3️⃣ 默认值 "You are a helpful AI assistant."
 ```
+
+**工具集的决定**：
+
+| 规则        | 说明                                                                     |
+| ----------- | ------------------------------------------------------------------------ |
+| 🔧 内置映射 | 指定有效的 `promptType` 时，使用 `PROMPT_TOOL_MAPPING`                   |
+| ➕ 工具合并 | `allowedTools` 与映射工具**取并集**                                      |
+| 💡 示例     | `bossZhipinSystemPrompt` + `["puppeteer"]` = BOSS 直聘工具集 + puppeteer |
 
 ## 可用的 promptType
 
-使用 `GET /api/v1/prompt-types` 查询所有可用的提示词类型：
+使用 `GET /api/v1/prompt-types` 查询所有可用的 `promptType` 值：
 
-```bash
+<CodeGroup>
+
+```bash 请求 icon="terminal"
 curl -X GET https://huajune.duliday.com/api/v1/prompt-types \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-响应示例：
-
-```json
+```json 响应 lines icon="list-check"
 {
   "success": true,
   "data": {
@@ -69,43 +150,196 @@ curl -X GET https://huajune.duliday.com/api/v1/prompt-types \
       {
         "id": "generalComputerSystemPrompt",
         "description": "通用计算机助手系统提示词"
+      },
+      {
+        "id": "bossZhipinLocalSystemPrompt",
+        "description": "BOSS直聘本地助手系统提示词"
       }
     ]
   }
 }
 ```
 
-## 优先级规则
+</CodeGroup>
 
-系统提示词的优先级顺序：
+## 查询 promptType 对应的工具
 
-1. **直接指定** (`systemPrompt` 字段)
-2. **类型查找** (`promptType` 在 `context.systemPrompts` 中查找)
-3. **默认值** ("You are a helpful AI assistant.")
+使用 `GET /api/v1/tools` 查看每个 `promptType` 对应的工具集：
+
+```bash 查询工具列表 icon="terminal"
+curl -X GET https://huajune.duliday.com/api/v1/tools \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+响应会列出每个工具及其所属的 `promptType`。
+
+## 完整示例
+
+### 示例 1：使用 promptType 同时配置工具和 prompt
+
+```json promptType 同时配置工具和 prompt highlight={9-13} lines expandable icon="briefcase"
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [
+    {
+      "role": "user",
+      "content": "帮我安排一个面试"
+    }
+  ],
+  "promptType": "bossZhipinSystemPrompt",
+  "context": {
+    "systemPrompts": {
+      "bossZhipinSystemPrompt": "你是BOSS直聘招聘助手，专注于帮助 HR 与候选人沟通。你需要专业、高效、友好。"
+    },
+    "configData": {
+      // 招聘工具所需的配置...
+    }
+  }
+}
+```
+
+**效果**：
+
+- ✅ System prompt: 使用你提供的自定义文本
+- ✅ 可用工具: `bossZhipinSystemPrompt` 对应的招聘工具集
+
+### 示例 2：直接指定 systemPrompt（覆盖一切）
+
+```json 直接指定 systemPrompt（最高优先级） highlight={9} lines icon="star"
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [
+    {
+      "role": "user",
+      "content": "帮我写一段 Python 代码"
+    }
+  ],
+  "systemPrompt": "你是一个专业的 Python 编程导师，擅长用简单易懂的语言解释复杂的编程概念。",
+  "promptType": "generalComputerSystemPrompt"
+}
+```
+
+**效果**：
+
+- ✅ System prompt: 使用你直接指定的文本（覆盖 `promptType` 查找）
+- ✅ 可用工具: `generalComputerSystemPrompt` 对应的工具集
+
+<Tip>
+  **注意**：这里 `promptType` 的作用**仅用于工具集映射**，不会用于查找 system
+  prompt（因为 `systemPrompt` 优先级更高）。
+</Tip>
+
+### 示例 3：仅使用 promptType 启用工具
+
+```json 仅使用 promptType 启用工具（使用默认 prompt） highlight={9} icon="wrench"
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [
+    {
+      "role": "user",
+      "content": "帮我查看当前目录"
+    }
+  ],
+  "promptType": "generalComputerSystemPrompt"
+  // 没有提供 context.systemPrompts
+}
+```
+
+**效果**：
+
+- ℹ️ System prompt: 使用默认值 `"You are a helpful AI assistant."`
+- ✅ 可用工具: `generalComputerSystemPrompt` 对应的工具集
+
+## 验证配置
+
+### 使用 validateOnly 预检
+
+使用 `validateOnly: true` 检查配置是否正确，而不实际执行对话：
+
+```json 使用 validateOnly 预检配置 highlight={6} icon="clipboard-check"
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [...],
+  "promptType": "bossZhipinSystemPrompt",
+  "context": {...},
+  "validateOnly": true
+}
+```
+
+响应会告诉你：
+
+- 哪些工具可以成功初始化
+- 缺少哪些必需的上下文
+- `promptType` 是否有效
+
+### 无效的 promptType
+
+如果 `promptType` 不在 `OPEN_API_PROMPT_TYPES` 列表中，系统会：
+
+- ⚠️ **忽略工具集映射**：不会自动启用该 promptType 对应的工具
+- ✅ **仍可查找 system prompt**：如果你在 `context.systemPrompts` 中提供了该键，仍会使用
+
+**示例**：
+
+```json 无效的 promptType 示例 highlight={2,8} lines icon="triangle-exclamation"
+{
+  "promptType": "myCustomPrompt", // 不在 OPEN_API_PROMPT_TYPES 中
+  "context": {
+    "systemPrompts": {
+      "myCustomPrompt": "你是自定义助手"
+    }
+  },
+  "allowedTools": ["bash"] // 必须手动指定工具
+}
+```
+
+**结果**：
+
+- System prompt: 使用 "你是自定义助手" ✅
+- 工具集: 仅 bash（不会自动映射工具）⚠️
+
+**建议**：使用 `GET /api/v1/prompt-types` 查询有效值以获得完整的工具集映射支持。
 
 ## 最佳实践
 
 <AccordionGroup>
   <Accordion title="明确角色定位">
     清晰定义 AI 的身份和职责：
-    
+
     ```
     "你是一个专业的Python编程导师，擅长用简单易懂的语言解释复杂的编程概念。"
     ```
+
   </Accordion>
 
-{" "}
-<Accordion title="设置行为准则">
-  明确 AI 应该遵循的规则： ``` "回复时请遵循：1) 使用中文 2) 回答简洁 3)
-  提供代码示例" ```
-</Accordion>
+  <Accordion title="设置行为准则">
+    明确 AI 应该遵循的规则：
+
+    ```
+    "回复时请遵循：1) 使用中文 2) 回答简洁 3) 提供代码示例"
+    ```
+
+  </Accordion>
 
   <Accordion title="定义输出格式">
     如需特定格式的输出，在提示词中说明：
-    
+
     ```
     "回复格式要求：使用Markdown，代码块使用语法高亮"
     ```
+
+  </Accordion>
+
+{" "}
+
+<Accordion title="使用 promptType 管理场景">
+  如果你的应用有多个场景（如招聘、客服、技术支持），使用 `promptType` 来： -
+  为每个场景配置专用工具集 - 在 `context.systemPrompts` 中管理多个提示词模板 -
+  通过切换 `promptType` 快速切换场景
+</Accordion>
+
+  <Accordion title="简单场景直接用 systemPrompt">
+    如果你的应用只有一个场景，或者不需要工具调用，直接使用 `systemPrompt` 参数最简单。
   </Accordion>
 </AccordionGroup>
 
@@ -120,11 +354,23 @@ curl -X GET https://huajune.duliday.com/api/v1/prompt-types \
     了解完整的上下文配置
   </Card>
 
+{" "}
+
+<Card title="工具系统" icon="wrench" href="/concepts/tools">
+  了解工具如何与 promptType 配合
+</Card>
+
+{" "}
+
+<Card title="文本对话" icon="message" href="/features/text-chat">
+  开始使用文本对话功能
+</Card>
+
   <Card
-    title="文本对话"
-    icon="message"
-    href="/features/text-chat"
+    title="工具调用"
+    icon="code"
+    href="/features/tool-calling"
   >
-    开始使用文本对话功能
+    查看工具调用的完整示例
   </Card>
 </CardGroup>

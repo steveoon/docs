@@ -10,6 +10,7 @@ description: "理解和配置请求上下文"
 - 配置工具所需的参数
 - 提供业务相关的配置数据
 - 定义系统提示词模板
+- 指定品牌、模型等偏好设置
 
 ## 上下文结构
 
@@ -17,83 +18,480 @@ description: "理解和配置请求上下文"
 
 所有工具共享的通用上下文：
 
-```json
+```json 基本结构
 {
   "context": {
     "preferredBrand": "品牌名称",
-    "modelConfig": {
-      "providerConfigs": {...}
-    },
     "configData": {...},
     "replyPrompts": {...},
-    "systemPrompts": {...}
+    "systemPrompts": {...},
+    "dulidayToken": "your_token"
   }
 }
 ```
 
 ### toolContext
 
-为特定工具提供专属上下文：
+为特定工具提供专属上下文，会**覆盖**全局 `context` 中的同名字段：
 
-```json
+```json 工具特定配置
 {
   "toolContext": {
     "zhipin_reply_generator": {
-      "configData": {...},
-      "replyPrompts": {...}
+      "replyPrompts": {...}  // 覆盖全局设置
     }
   }
 }
 ```
 
-<Note>`toolContext` 中的配置会覆盖 `context` 中的同名字段。</Note>
+## Context 字段速查表
 
-## 常用上下文字段
+`context` 对象包含以下字段，**所有字段都是可选的**：
 
-使用 `GET /api/v1/config-schema` 查看完整的字段说明：
+| 字段              | 类型                     | 使用场景                              |
+| ----------------- | ------------------------ | ------------------------------------- |
+| `configData`      | `ZhipinData`             | **`zhipin_reply_generator` 工具必需** |
+| `replyPrompts`    | `ReplyPromptsConfig`     | **`zhipin_reply_generator` 工具必需** |
+| `systemPrompts`   | `Record<string, string>` | 配合 `promptType` 使用                |
+| `dulidayToken`    | `string`                 | **Duliday 相关工具必需**              |
+| `preferredBrand`  | `string`                 | 多品牌配置时指定默认品牌              |
+| `modelConfig`     | `ModelConfig`            | 自定义 AI 提供商设置                  |
+| `defaultWechatId` | `string`                 | 微信相关工具使用                      |
 
-```bash
-curl -X GET https://huajune.duliday.com/api/v1/config-schema \
+<Tip>点击下方折叠面板查看每个字段的详细说明和示例。</Tip>
+
+## 字段详解
+
+<AccordionGroup>
+  <Accordion title="configData - 业务配置数据" icon="database">
+    业务配置数据，包含品牌信息、门店列表、筛选条件等。
+
+    <Warning>
+      工具 `zhipin_reply_generator` **必需** `configData` 和 `replyPrompts`，否则会返回 400 错误（或根据 `contextStrategy` 处理）。
+    </Warning>
+
+    ```json configData 示例 lines icon="database"
+    {
+      "context": {
+        "configData": {
+          "city": "上海",
+          "stores": [
+            {
+              "name": "南京西路店",
+              "address": "上海市静安区南京西路123号"
+            }
+          ],
+          "brands": {
+            "蜀地源冒菜": {
+              "templates": {
+                "general_chat": ["您好，这里是蜀地源冒菜招聘"]
+              },
+              "screening": {
+                "age": { "min": 18, "max": 55 }
+              }
+            }
+          },
+          "defaultBrand": "蜀地源冒菜"
+        }
+      }
+    }
+    ```
+
+  </Accordion>
+
+  <Accordion title="replyPrompts - 回复提示词配置" icon="message-lines">
+    回复提示词配置，定义不同场景下的回复模板。类型为 `Record<ReplyContext, string>`。
+
+    **可用的场景键**：
+    - `general_chat` - 常规聊天
+    - `initial_inquiry` - 初次询问
+    - `schedule_inquiry` - 排班询问
+    - `salary_inquiry` - 薪资询问
+    - `interview_request` - 面试邀请
+    - `availability_inquiry` - 时间确认
+    - `followup_chat` - 后续跟进
+    - `age_concern` - 年龄问题
+
+    ```json replyPrompts 示例 lines icon="message-lines"
+    {
+      "context": {
+        "replyPrompts": {
+          "general_chat": "你是连锁餐饮招聘助手，请用简洁礼貌的语气与候选人沟通。",
+          "initial_inquiry": "向候选人简要介绍品牌与岗位，并询问其城市与时间安排。",
+          "salary_inquiry": "清晰说明薪资结构，包括基本工资、绩效奖金和福利。"
+        }
+      }
+    }
+    ```
+
+  </Accordion>
+
+  <Accordion title="systemPrompts - 系统提示词映射表" icon="brain">
+    系统提示词映射表，是一个键值对对象（`Record<string, string>`）。
+
+    通过 `promptType` 参数从此映射表中查找对应的 system prompt 文本。
+
+    <Note>
+      `systemPrompts` 仅用于 system prompt 查找，不影响工具集。`promptType` 的工具映射是内置的。详见[系统提示词文档](/concepts/system-prompts)。
+    </Note>
+
+    ```json systemPrompts 示例 highlight={3-6} lines icon="brain"
+    {
+      "promptType": "bossZhipinSystemPrompt",
+      "context": {
+        "systemPrompts": {
+          "bossZhipinSystemPrompt": "你是BOSS直聘招聘助手...",
+          "generalComputerSystemPrompt": "你是一个通用AI助手..."
+        }
+      }
+    }
+    ```
+
+    → 使用 "你是BOSS直聘招聘助手..." 作为 system prompt
+
+  </Accordion>
+
+  <Accordion title="dulidayToken - Duliday API 令牌" icon="key">
+    Duliday 系统的 API 访问令牌。
+
+    <Warning>
+      所有 Duliday 相关工具（如 `duliday_job_list`、`duliday_job_details`、`duliday_interview_booking`）都**必需**此字段。
+    </Warning>
+
+    ```json dulidayToken 示例 icon="key"
+    {
+      "context": {
+        "dulidayToken": "your_duliday_api_token"
+      }
+    }
+    ```
+
+  </Accordion>
+
+  <Accordion title="preferredBrand - 首选品牌" icon="star">
+    指定首选的品牌名称，当 `configData` 包含多个品牌时，使用此字段选择默认品牌。
+
+    ```json preferredBrand 示例 highlight={3} lines icon="star"
+    {
+      "context": {
+        "preferredBrand": "蜀地源冒菜",
+        "configData": {
+          "brands": {
+            "蜀地源冒菜": {...},
+            "另一个品牌": {...}
+          }
+        }
+      }
+    }
+    ```
+
+  </Accordion>
+
+  <Accordion title="modelConfig - 模型配置" icon="gear">
+    自定义模型配置，可以覆盖默认的 AI 提供商设置。
+
+    ```json modelConfig 示例 lines icon="gear"
+    {
+      "context": {
+        "modelConfig": {
+          "chatModel": "anthropic/claude-3-7-sonnet-20250219",
+          "classifyModel": "qwen/qwen-max-latest",
+          "replyModel": "qwen/qwen-plus-latest",
+          "providerConfigs": {
+            "anthropic": {
+              "apiKey": "your-key",
+              "baseURL": "https://api.anthropic.com"
+            }
+          }
+        }
+      }
+    }
+    ```
+
+  </Accordion>
+
+  <Accordion title="defaultWechatId - 默认微信号" icon="message">
+    默认微信号，用于微信相关工具。
+
+    ```json defaultWechatId 示例 icon="message"
+    {
+      "context": {
+        "defaultWechatId": "hr_wechat_001"
+      }
+    }
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+<Accordion title="📦 sandboxId - 沙盒环境（点击展开）" icon="box">
+  E2B 沙盒 ID，用于需要沙箱环境的工具（如 `computer`）。
+
+{" "}
+
+<Warning>`sandboxId` 是**顶层字段**，不属于 `context` 对象。</Warning>
+
+```json sandboxId 位置示例 highlight={4} lines icon="box"
+{
+  "model": "anthropic/claude-3-7-sonnet-20250219",
+  "messages": [...],
+  "sandboxId": "sb_abc123",  // ← 顶层字段
+  "promptType": "generalComputerSystemPrompt",
+  "context": {
+    // sandboxId 不在这里
+    "preferredBrand": "..."
+  }
+}
+```
+
+**需要沙盒的工具**：
+
+- `computer` - E2B 计算机控制工具
+
+查询哪些工具需要沙盒：
+
+```bash 查询工具 icon="terminal"
+curl -X GET https://huajune.duliday.com/api/v1/tools \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-### configData
+响应中 `requiresSandbox: true` 的工具需要提供 `sandboxId`。
 
-业务配置数据，工具 `zhipin_reply_generator` 必需。
+</Accordion>
 
-### replyPrompts
+## 完整示例
 
-回复提示词配置，定义不同场景下的回复模板。
+<Tabs>
+  <Tab title="智能回复工具">
+    使用智能回复工具的完整配置示例：
 
-### systemPrompts
+    ```json 智能回复工具完整配置 lines expandable icon="message-bot"
+    {
+      "model": "anthropic/claude-3-7-sonnet-20250219",
+      "messages": [
+        {
+          "role": "user",
+          "content": "你好，我想了解一下这个职位"
+        }
+      ],
+      "promptType": "bossZhipinSystemPrompt",
+      "allowedTools": ["zhipin_reply_generator"],
+      "context": {
+        "preferredBrand": "蜀地源冒菜",
+        "configData": {
+          "city": "上海",
+          "stores": [
+            {
+              "name": "南京西路店",
+              "address": "上海市静安区南京西路123号"
+            }
+          ],
+          "brands": {
+            "蜀地源冒菜": {
+              "templates": {
+                "general_chat": ["您好，这里是蜀地源冒菜招聘，请问有什么可以帮助您？"]
+              },
+              "screening": {
+                "age": { "min": 18, "max": 55, "preferred": [] },
+                "blacklistKeywords": [],
+                "preferredKeywords": []
+              }
+            }
+          },
+          "defaultBrand": "蜀地源冒菜"
+        },
+        "systemPrompts": {
+          "bossZhipinSystemPrompt": "你是BOSS直聘招聘助手，负责与候选人沟通岗位信息。"
+        },
+        "replyPrompts": {
+          "general_chat": "你是连锁餐饮招聘助手，请用简洁礼貌的语气与候选人沟通。",
+          "initial_inquiry": "向候选人简要介绍品牌与岗位，并询问其城市与时间安排。"
+        },
+        "defaultWechatId": "hr_001"
+      }
+    }
+    ```
 
-系统提示词映射表，通过 `promptType` 引用。
+  </Tab>
 
-### sandboxId
+  <Tab title="toolContext 覆盖">
+    使用 `toolContext` 为不同工具提供不同配置：
 
-沙箱 ID，需要沙箱的工具必需（如 `computer`）。
+    ```json toolContext 覆盖示例 highlight={10-20} lines icon="layer-group"
+    {
+      "model": "anthropic/claude-3-7-sonnet-20250219",
+      "messages": [...],
+      "allowedTools": ["zhipin_reply_generator", "duliday_job_list"],
+      "context": {
+        "preferredBrand": "全局品牌",
+        "configData": {...},
+        "replyPrompts": {"general_chat": "全局回复模板"}
+      },
+      "toolContext": {
+        "zhipin_reply_generator": {
+          "preferredBrand": "蜀地源冒菜",
+          "replyPrompts": {
+            "general_chat": "蜀地源冒菜专用回复模板"
+          }
+        },
+        "duliday_job_list": {
+          "dulidayToken": "特定的token"
+        }
+      }
+    }
+    ```
+
+    **合并结果**：
+    - `zhipin_reply_generator` 使用：
+      - `preferredBrand`: "蜀地源冒菜" （来自 `toolContext`）
+      - `configData`: 全局的 `configData` （未被覆盖）
+      - `replyPrompts`: `{"general_chat": "蜀地源冒菜专用回复模板"}` （来自 `toolContext`）
+    - `duliday_job_list` 使用：
+      - `preferredBrand`: "全局品牌" （来自全局 `context`）
+      - `dulidayToken`: "特定的token" （来自 `toolContext`）
+
+  </Tab>
+
+  <Tab title="Duliday 工具">
+    使用 Duliday 相关工具的配置示例：
+
+    ```json Duliday 工具配置 highlight={7-9} lines icon="briefcase"
+    {
+      "model": "anthropic/claude-3-7-sonnet-20250219",
+      "messages": [
+        {"role": "user", "content": "帮我查询职位列表"}
+      ],
+      "allowedTools": ["duliday_job_list", "duliday_job_details"],
+      "context": {
+        "preferredBrand": "蜀地源冒菜",
+        "dulidayToken": "your_duliday_api_token"
+      }
+    }
+    ```
+
+    <Warning>
+      所有 Duliday 工具（`duliday_job_list`、`duliday_job_details`、`duliday_interview_booking`）都必须提供 `dulidayToken`。
+    </Warning>
+
+  </Tab>
+</Tabs>
 
 ## 上下文策略
 
 通过 `contextStrategy` 控制缺失上下文的处理方式：
 
-```json
-{
-  "contextStrategy": "error" // error | skip | report
-}
-```
+| 策略     | 行为                                    |
+| -------- | --------------------------------------- |
+| `error`  | 返回 400 错误并列出缺失字段（**默认**） |
+| `skip`   | 跳过无法初始化的工具                    |
+| `report` | 返回验证报告，不执行请求                |
 
-| 策略     | 行为                        |
-| -------- | --------------------------- |
-| `error`  | 返回 400 错误并列出缺失字段 |
-| `skip`   | 跳过无法初始化的工具        |
-| `report` | 返回验证报告，不执行请求    |
+<AccordionGroup>
+  <Accordion title="error 策略（默认）" icon="circle-exclamation">
+    当工具缺少必需上下文时，立即返回 400 错误：
+
+    <CodeGroup>
+      ```json 请求示例 icon="paper-plane"
+      {
+        "model": "anthropic/claude-3-7-sonnet-20250219",
+        "messages": [...],
+        "allowedTools": ["zhipin_reply_generator"],
+        "context": {},  // 缺少 configData 和 replyPrompts
+        "contextStrategy": "error"
+      }
+      ```
+
+      ```json 响应 (400) highlight={2-3} lines icon="triangle-exclamation"
+      {
+        "error": "Tool 'zhipin_reply_generator' Missing required context: configData, replyPrompts. Please provide these fields in 'context' or 'toolContext.zhipin_reply_generator'.",
+        "statusCode": 400,
+        "correlationId": "req_abc123"
+      }
+      ```
+    </CodeGroup>
+
+  </Accordion>
+
+  <Accordion title="skip 策略" icon="forward">
+    跳过无法初始化的工具，继续执行其他工具：
+
+    <CodeGroup>
+      ```json 请求示例 icon="paper-plane"
+      {
+        "model": "anthropic/claude-3-7-sonnet-20250219",
+        "messages": [...],
+        "allowedTools": ["bash", "zhipin_reply_generator"],
+        "context": {},  // 缺少 zhipin_reply_generator 所需的上下文
+        "contextStrategy": "skip"
+      }
+      ```
+
+      ```text 响应 (200) icon="check"
+      HTTP/1.1 200 OK
+      X-Tools-Skipped: zhipin_reply_generator (Missing required context: configData, replyPrompts)
+      Content-Type: application/json
+
+      {
+        "success": true,
+        "data": {
+          "messages": [...],  // 只使用了 bash 工具
+          "tools": {
+            "used": ["bash"],
+            "skipped": ["zhipin_reply_generator"]
+          }
+        }
+      }
+      ```
+    </CodeGroup>
+
+  </Accordion>
+
+  <Accordion title="report 策略" icon="clipboard-list">
+    返回验证报告，不执行请求：
+
+    <CodeGroup>
+      ```json 请求示例 icon="paper-plane"
+      {
+        "model": "anthropic/claude-3-7-sonnet-20250219",
+        "messages": [...],
+        "allowedTools": ["bash", "zhipin_reply_generator"],
+        "context": {
+          "configData": {...}  // 提供了 configData，但缺少 replyPrompts
+        },
+        "contextStrategy": "report"
+      }
+      ```
+
+      ```json 响应 (200) highlight={9-12} lines icon="clipboard-check"
+      {
+        "valid": false,
+        "model": {
+          "valid": true
+        },
+        "tools": [
+          {"name": "bash", "valid": true},
+          {
+            "name": "zhipin_reply_generator",
+            "valid": false,
+            "missingContext": ["replyPrompts"]
+          }
+        ]
+      }
+      ```
+    </CodeGroup>
+
+    <Tip>
+      `report` 策略等价于 `validateOnly: true`，适合在实际调用前预检配置。
+    </Tip>
+
+  </Accordion>
+</AccordionGroup>
 
 ## 验证上下文
 
 使用 `validateOnly` 模式检查上下文配置：
 
-```json
+```json 验证模式 highlight={6} icon="check-double"
 {
   "model": "anthropic/claude-3-7-sonnet-20250219",
   "messages": [...],
@@ -104,6 +502,26 @@ curl -X GET https://huajune.duliday.com/api/v1/config-schema \
 ```
 
 返回验证报告，说明哪些工具可以成功初始化，哪些缺少必需的上下文。
+
+<Note>`validateOnly: true` 的效果与 `contextStrategy: "report"` 相同。</Note>
+
+## 快速查询 API
+
+<CardGroup cols={2}>
+  <Card title="查看字段类型定义" icon="code">
+    ```bash icon="terminal"
+    curl -X GET https://huajune.duliday.com/api/v1/config-schema \
+      -H "Authorization: Bearer YOUR_API_KEY"
+    ```
+  </Card>
+
+  <Card title="查看工具所需上下文" icon="toolbox">
+    ```bash icon="terminal"
+    curl -X GET https://huajune.duliday.com/api/v1/tools \
+      -H "Authorization: Bearer YOUR_API_KEY"
+    ```
+  </Card>
+</CardGroup>
 
 ## 下一步
 
@@ -116,11 +534,23 @@ curl -X GET https://huajune.duliday.com/api/v1/config-schema \
     了解工具如何使用上下文
   </Card>
 
+{" "}
+
+<Card title="系统提示词" icon="message-lines" href="/concepts/system-prompts">
+  了解 systemPrompts 字段的详细用法
+</Card>
+
+{" "}
+
+<Card title="工具调用" icon="code" href="/features/tool-calling">
+  查看完整的工具调用示例
+</Card>
+
   <Card
-    title="工具调用"
-    icon="code"
-    href="/features/tool-calling"
+    title="错误处理"
+    icon="triangle-exclamation"
+    href="/features/error-handling"
   >
-    查看完整的工具调用示例
+    了解如何处理上下文缺失错误
   </Card>
 </CardGroup>
