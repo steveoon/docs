@@ -4,6 +4,7 @@
 # 工具调用 API 测试脚本（流式）
 # 严格按照 features/tool-calling.mdx 文档示例编写
 # 用于验证文档准确性和实际 API 行为（SSE 流式响应）
+# 使用真实的生产数据结构
 ###############################################################################
 
 # 配置项（可通过环境变量覆盖）
@@ -22,8 +23,7 @@ echo "事件文件: $EVENTS_FILE"
 echo "------------------------------------------------"
 echo ""
 
-# 完全按照文档示例的请求（参考 features/tool-calling.mdx 流式响应部分）
-# 显式设置 stream: true（或依赖默认行为）
+# 使用真实生产数据结构的请求
 echo "📤 发送请求（stream: true）..."
 curl -X POST ${API_URL}/api/v1/chat \
   -H "Authorization: Bearer ${API_KEY}" \
@@ -39,19 +39,162 @@ curl -X POST ${API_URL}/api/v1/chat \
     ],
     "allowedTools": ["zhipin_reply_generator"],
     "context": {
-      "preferredBrand": "蜀地源冒菜",
+      "preferredBrand": "来伊份",
       "configData": {
         "city": "上海",
+        "defaultBrand": "来伊份",
+        "stores": [
+          {
+            "id": "store_307958",
+            "name": "沪亭北路六店",
+            "location": "上海市-松江区-九里亭街道沪亭北路260号松江公交(九里亭公交枢纽站)",
+            "district": "松江区",
+            "subarea": "沪亭北路六",
+            "coordinates": {
+              "lat": 31.1988,
+              "lng": 121.3874
+            },
+            "transportation": "地铁9号线九亭站，步行10分钟",
+            "brand": "来伊份",
+            "positions": [
+              {
+                "id": "pos_523940",
+                "name": "基础店员",
+                "timeSlots": [
+                  "15:00~22:00",
+                  "09:00~16:00"
+                ],
+                "salary": {
+                  "base": 24,
+                  "memo": "结算周期是T+7，举例本周一出勤的工时，下周一结算"
+                },
+                "workHours": "7",
+                "benefits": {
+                  "items": [
+                    "五险一金",
+                    "员工折扣"
+                  ]
+                },
+                "requirements": [
+                  "工作认真负责",
+                  "团队合作精神",
+                  "有相关工作经验者优先"
+                ],
+                "urgent": false,
+                "scheduleType": "flexible",
+                "attendancePolicy": {
+                  "punctualityRequired": false,
+                  "lateToleranceMinutes": 15,
+                  "attendanceTracking": "flexible",
+                  "makeupShiftsAllowed": true
+                },
+                "availableSlots": [
+                  {
+                    "slot": "15:00~22:00",
+                    "maxCapacity": 3,
+                    "currentBooked": 1,
+                    "isAvailable": true,
+                    "priority": "high"
+                  },
+                  {
+                    "slot": "09:00~16:00",
+                    "maxCapacity": 2,
+                    "currentBooked": 1,
+                    "isAvailable": true,
+                    "priority": "medium"
+                  }
+                ],
+                "schedulingFlexibility": {
+                  "canSwapShifts": true,
+                  "advanceNoticeHours": 24,
+                  "partTimeAllowed": true,
+                  "weekendRequired": false,
+                  "holidayRequired": false
+                },
+                "minHoursPerWeek": 20,
+                "maxHoursPerWeek": 40,
+                "attendanceRequirement": {
+                  "minimumDays": 3,
+                  "requiredDays": [],
+                  "description": "每周至少3天"
+                }
+              }
+            ]
+          }
+        ],
         "brands": {
-          "蜀地源冒菜": {
+          "来伊份": {
             "templates": {
-              "salary_inquiry": ["基本工资4000-6000元，另有全勤奖、绩效奖等"]
+              "initial_inquiry": [
+                "你好，来伊份在上海各区有兼职，排班{hours}小时，时薪{salary}元。"
+              ],
+              "location_inquiry": [
+                "离你比较近在{location}的来伊份门店有空缺，排班{schedule}，时薪{salary}元，有兴趣吗？"
+              ],
+              "no_location_match": [
+                "你附近暂时没岗位，{alternative_location}的门店考虑吗？{transport_info}"
+              ],
+              "interview_request": [
+                "可以帮你和店长约面试，加我微信吧，需要几个简单的个人信息。"
+              ],
+              "salary_inquiry": [
+                "基本薪资是{salary}元/小时，每周工作{min_hours}到{max_hours}小时。结算周期是T+7。"
+              ],
+              "schedule_inquiry": [
+                "排班比较灵活，一般是7小时一班，具体可以和店长商量。"
+              ],
+              "general_chat": [
+                "好的，有什么其他问题可以问我。"
+              ],
+              "age_concern": [
+                "我们招聘18-50岁，你的年龄没问题的。"
+              ],
+              "insurance_inquiry": [
+                "有五险一金，还有商业保险。"
+              ],
+              "followup_chat": [
+                "这家门店不合适也没关系，以后还有其他店空缺的，到时候可以再报名。"
+              ],
+              "attendance_inquiry": [
+                "出勤要求是每周至少{minimum_days}天，比较灵活的，可以和店长协商。"
+              ],
+              "flexibility_inquiry": [
+                "排班很灵活，支持换班，也接受兼职。"
+              ],
+              "attendance_policy_inquiry": [
+                "考勤要求不严格，最多可以迟到15分钟，也可以补班。"
+              ],
+              "work_hours_inquiry": [
+                "每周工作20-40小时，可以根据你的时间来安排。"
+              ],
+              "availability_inquiry": [
+                "{time_slot}班次还有{available_spots}个位置，{priority}优先级，可以报名。"
+              ],
+              "part_time_support": [
+                "完全支持兼职，时间可以和其他工作错开安排。"
+              ]
+            },
+            "screening": {
+              "age": {
+                "min": 18,
+                "max": 50,
+                "preferred": [20, 30, 40]
+              },
+              "blacklistKeywords": ["骗子", "不靠谱"],
+              "preferredKeywords": ["经验", "稳定", "长期"]
             }
           }
         }
       },
       "replyPrompts": {
-        "salary_inquiry": "用礼貌的语气说明薪资待遇，避免承诺无法兑现的条件"
+        "general_chat": "你是来伊份招聘助手，请用简洁友好的语气与候选人沟通。",
+        "initial_inquiry": "介绍来伊份的兼职岗位，时薪24元，工作时间灵活。",
+        "salary_inquiry": "说明时薪24元/小时，T+7结算，每周20-40小时，有五险一金和员工折扣。",
+        "location_inquiry": "告知松江区沪亭北路门店位置，地铁9号线九亭站可达。",
+        "schedule_inquiry": "说明排班灵活，有早班和晚班可选，每班7小时。",
+        "age_concern": "说明年龄要求18-50岁。",
+        "insurance_inquiry": "说明有五险一金和商业保险。",
+        "followup_chat": "保持友好耐心的态度，询问是否还有其他问题。"
       }
     }
   }' 2>/dev/null | tee $OUTPUT_FILE
@@ -65,14 +208,19 @@ echo ""
 # 解析 SSE 事件，提取 data: 后面的 JSON
 grep "^data: " $OUTPUT_FILE | sed 's/^data: //' > $EVENTS_FILE
 
-echo "提取到的事件数量: $(wc -l < $EVENTS_FILE)"
+event_count=$(wc -l < $EVENTS_FILE | tr -d ' ')
+echo "提取到的事件数量: $event_count"
 echo ""
 
 # 统计事件类型
 echo "📊 事件类型统计："
-cat $EVENTS_FILE | jq -r '.type' 2>/dev/null | sort | uniq -c | while read count type; do
-  echo "   $type: $count 个"
-done
+if [ "$event_count" -gt 0 ]; then
+  cat $EVENTS_FILE | jq -r '.type' 2>/dev/null | sort | uniq -c | while read count type; do
+    echo "   $type: $count 个"
+  done
+else
+  echo "   (无事件)"
+fi
 
 echo ""
 echo "================================================"
@@ -149,13 +297,17 @@ if [ -n "$output_event" ]; then
   echo "   📦 字段验证："
 
   # 验证 toolCallId 与 input 事件一致
-  input_call_id=$(echo "$input_event" | jq -r '.toolCallId')
-  if [ "$tool_call_id" = "$input_call_id" ]; then
-    echo "   ✅ toolCallId 与 input 事件一致: \"$tool_call_id\""
+  if [ -n "$input_event" ]; then
+    input_call_id=$(echo "$input_event" | jq -r '.toolCallId')
+    if [ "$tool_call_id" = "$input_call_id" ]; then
+      echo "   ✅ toolCallId 与 input 事件一致: \"$tool_call_id\""
+    else
+      echo "   ❌ toolCallId 不一致"
+      echo "      input 事件: \"$input_call_id\""
+      echo "      output 事件: \"$tool_call_id\""
+    fi
   else
-    echo "   ❌ toolCallId 不一致"
-    echo "      input 事件: \"$input_call_id\""
-    echo "      output 事件: \"$tool_call_id\""
+    echo "   ⚠️  无法验证 toolCallId 一致性（未找到 input 事件）"
   fi
 
   # 验证 output 字段
@@ -182,31 +334,17 @@ echo ""
 echo "关键验证项（对照 features/tool-calling.mdx）："
 echo ""
 
-# 1. 检查事件类型命名
-has_tool_start=$(cat $EVENTS_FILE | jq 'select(.type == "tool.start")' 2>/dev/null | wc -l)
-has_tool_complete=$(cat $EVENTS_FILE | jq 'select(.type == "tool.complete")' 2>/dev/null | wc -l)
-
-if [ "$has_tool_start" -gt 0 ] || [ "$has_tool_complete" -gt 0 ]; then
-  echo "⚠️  发现 tool.start 或 tool.complete 事件"
-  echo "   文档示例使用这些事件名，但实际 API 返回的是："
-  echo "   - tool-input-available（对应 tool.start）"
-  echo "   - tool-output-available（对应 tool.complete）"
-  echo ""
-fi
-
-# 2. 检查是否有 args 字段
-has_args=$(cat $EVENTS_FILE | jq 'select(.args != null)' 2>/dev/null | wc -l)
-if [ "$has_args" -gt 0 ]; then
-  echo "❌ 文档错误: 事件包含 args 字段"
-  echo "   文档描述应该是 input 字段"
-  echo ""
-fi
-
-# 3. 检查参数命名约定
-if [ -n "$input_event" ]; then
-  snake_case_count=$(echo "$input_event" | jq '[.input | keys[] | select(test("_"))] | length' 2>/dev/null)
-  if [ "$snake_case_count" -gt 0 ]; then
-    echo "✅ 参数使用 snake_case 命名（与文档一致）"
+# 检查是否成功调用工具
+if [ -n "$input_event" ] && [ -n "$output_event" ]; then
+  echo "✅ 工具调用成功（input 和 output 事件都存在）"
+  echo "✅ 流式响应中包含完整的工具调用流程"
+else
+  echo "❌ 工具调用不完整"
+  if [ -z "$input_event" ]; then
+    echo "   - 缺失 tool-input-available 事件"
+  fi
+  if [ -z "$output_event" ]; then
+    echo "   - 缺失 tool-output-available 事件"
   fi
 fi
 

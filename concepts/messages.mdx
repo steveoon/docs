@@ -295,12 +295,68 @@ interface UIMessage {
 
   </Accordion>
 
-  <Accordion title="工具调用响应结构" icon="info-circle">
-    **说明**：启用工具调用时，API 响应包含 `dynamic-tool` parts
+  <Accordion title="工具调用响应中的消息结构" icon="info-circle">
+    **说明**：启用工具调用时，**非流式**响应或流式响应完成后，API 返回的 `data.messages` 数组中会包含 `dynamic-tool` 类型的 parts
 
-    ```json 工具调用响应示例 lines expandable icon="check"
-    {
-      "messages": [
+    <Note>
+      **流式 vs 非流式的区别**：
+      - **流式响应**：工具调用以独立的 SSE 事件返回（`tool-input-available` 和 `tool-output-available`）
+      - **非流式响应**：工具调用包含在 messages 数组的 `dynamic-tool` part 中
+      - 详见[工具调用功能文档](/features/tool-calling)的流式响应部分
+    </Note>
+
+    <CodeGroup>
+      ```json 完整 API 响应 lines expandable icon="check"
+      {
+        "success": true,
+        "data": {
+          "messages": [
+            {
+              "id": "msg_001",
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "dynamic-tool",
+                  "toolName": "zhipin_reply_generator",
+                  "toolCallId": "call_abc123",
+                  "state": "output-available",
+                  "input": {
+                    "candidate_message": "你们薪资待遇怎么样？",
+                    "brand": "蜀地源冒菜"
+                  },
+                  "output": {
+                    "reply": "您好！我们的薪资范围是4000-6000元，另有全勤奖、绩效奖等。"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "msg_002",
+              "role": "assistant",
+              "parts": [
+                {
+                  "type": "text",
+                  "text": "已为您生成专业的招聘回复",
+                  "state": "done"
+                }
+              ]
+            }
+          ],
+          "usage": {
+            "inputTokens": 150,
+            "outputTokens": 80,
+            "totalTokens": 230
+          },
+          "tools": {
+            "used": ["zhipin_reply_generator"],
+            "skipped": []
+          }
+        }
+      }
+      ```
+
+      ```json 仅 messages 部分 lines icon="list"
+      [
         {
           "id": "msg_001",
           "role": "assistant",
@@ -326,16 +382,21 @@ interface UIMessage {
           "parts": [
             {
               "type": "text",
-              "text": "已为您生成专业的招聘回复"
+              "text": "已为您生成专业的招聘回复",
+              "state": "done"
             }
           ]
         }
       ]
-    }
-    ```
+      ```
+    </CodeGroup>
 
     <Tip>
-      工具调用和结果包含在同一个 `dynamic-tool` part 中。服务端自动执行工具并管理 `toolCallId`，客户端无需手动处理。详见[工具调用](/features/tool-calling)
+      **关键点**：
+      - 工具调用和结果包含在同一个 `dynamic-tool` part 中
+      - 服务端自动执行工具并管理 `toolCallId`
+      - 客户端从 `data.messages` 数组中提取消息
+      - 详见[工具调用功能文档](/features/tool-calling)
     </Tip>
 
   </Accordion>

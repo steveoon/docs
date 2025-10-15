@@ -7,7 +7,7 @@ description: "理解和处理 API 错误"
 
 所有错误响应遵循统一格式：
 
-```json
+```json 标准错误响应格式 icon="triangle-exclamation" lines
 {
   "error": "ErrorType",
   "message": "Human-readable error message",
@@ -19,45 +19,102 @@ description: "理解和处理 API 错误"
 }
 ```
 
+**响应头**：
+
+```
+X-Correlation-Id: req_abc123
+```
+
+<Note>
+  **字段说明**：
+  - `error`: 错误类型（对应 HTTP 状态码）
+  - `message`: 人类可读的错误描述
+  - `details`: 可选的额外错误信息
+  - `statusCode`: HTTP 状态码
+  - `correlationId`: 用于追踪请求的唯一标识符（**注意**：401 认证错误不包含此字段）
+  - `X-Correlation-Id` 响应头：与响应体中的 `correlationId` 相同（**注意**：401 错误也不包含此响应头）
+</Note>
+
 ## HTTP 状态码
 
-| 状态码 | 类型                | 说明           |
-| ------ | ------------------- | -------------- |
-| 400    | BadRequest          | 请求参数错误   |
-| 401    | Unauthorized        | 认证失败       |
-| 403    | Forbidden           | 权限不足       |
-| 404    | NotFound            | 资源不存在     |
-| 409    | Conflict            | 资源冲突       |
-| 429    | RateLimitExceeded   | 超过速率限制   |
-| 500    | InternalServerError | 服务器内部错误 |
-| 503    | ServiceUnavailable  | 服务暂时不可用 |
+| 状态码 | 类型                | 说明                                   |
+| ------ | ------------------- | -------------------------------------- |
+| 400    | BadRequest          | 请求参数错误                           |
+| 401    | Unauthorized        | 认证失败                               |
+| 403    | Forbidden           | 权限不足                               |
+| 404    | NotFound            | 资源不存在                             |
+| 409    | Conflict            | 资源冲突                               |
+| 429    | TooManyRequests     | 超过速率限制（⚠️ 当前未实现限流功能） |
+| 500    | InternalServerError | 服务器内部错误                         |
+| 503    | ServiceUnavailable  | 服务暂时不可用                         |
 
 ## 常见错误
 
+<Note>
+  **错误响应层级说明**：
+  - **401 认证错误**：在 middleware 层处理
+    - 响应体格式：`{error, message, statusCode}`（无 `correlationId` 和 `details`）
+    - 响应头：**不包含** `X-Correlation-Id`
+  - **其他错误**（400、403、500 等）：在 API 路由层处理
+    - 响应体格式：`{error, message, statusCode, correlationId, details?}`
+    - 响应头：**包含** `X-Correlation-Id`
+  - **429 错误**：当前未实现，不会返回此错误（错误类型已定义但未使用）
+</Note>
+
 ### 401 Unauthorized
 
-**原因**：API Key 无效或缺失
+**原因**：API Key 无效、缺失或格式错误
 
-```json
-{
-  "error": "Unauthorized",
-  "message": "Invalid or missing API key",
-  "statusCode": 401,
-  "correlationId": "req_abc123"
-}
-```
+认证失败有以下几种情况，错误消息会相应变化：
+
+<AccordionGroup>
+  <Accordion title="缺少 Authorization 头" icon="ban">
+    ```json 401 错误响应 icon="lock" highlight={3}
+    {
+      "error": "Unauthorized",
+      "message": "Missing authorization header",
+      "statusCode": 401
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Authorization 格式错误" icon="triangle-exclamation">
+    ```json 401 错误响应 icon="lock" highlight={3}
+    {
+      "error": "Unauthorized",
+      "message": "Invalid authorization format. Use: Bearer <token>",
+      "statusCode": 401
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Token 无效或已过期" icon="key">
+    ```json 401 错误响应 icon="lock" highlight={3}
+    {
+      "error": "Unauthorized",
+      "message": "Invalid or expired API key",
+      "statusCode": 401
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  **注意**：401 认证错误在 middleware 层处理，响应中**不包含** `correlationId` 字段，响应头中也**不包含** `X-Correlation-Id`。只有进入 API 路由后的错误（400、403、500 等）才在响应体和响应头中同时包含 correlationId。（429 当前未实现）
+</Warning>
 
 **解决方案**：
 
 1. 检查 API Key 是否正确
 2. 确认 Authorization 头格式：`Bearer YOUR_API_KEY`
 3. 验证 API Key 是否已过期
+4. 确认外部认证服务是否可用
 
 ### 403 Forbidden
 
 **原因**：模型或工具不在许可列表中
 
-```json
+```json 403 错误响应 icon="ban" highlight={3}
 {
   "error": "Forbidden",
   "message": "Model not available with your API key",
@@ -76,18 +133,22 @@ description: "理解和处理 API 错误"
 
 **原因**：工具缺少必需的上下文参数
 
-```json
+```json 400 错误响应 icon="triangle-exclamation" highlight={4-7} lines
 {
   "error": "BadRequest",
   "message": "Missing required context: configData, replyPrompts",
   "details": {
-    "missingContext": ["configData", "replyPrompts"],
-    "tools": ["zhipin_reply_generator"]
+    "error": "Missing required context: configData, replyPrompts",
+    "missingContext": ["configData", "replyPrompts"]
   },
   "statusCode": 400,
   "correlationId": "req_ghi789"
 }
 ```
+
+<Warning>
+  **注意**：`details.error` 字段包含与 `message` 相同的错误描述，`missingContext` 数组列出了所有缺失的上下文字段名称。
+</Warning>
 
 **解决方案**：
 
@@ -95,23 +156,39 @@ description: "理解和处理 API 错误"
 2. 在 `context` 或 `toolContext` 中提供缺失的字段
 3. 或使用 `contextStrategy: "skip"` 跳过该工具
 
-### 429 RateLimitExceeded
+### 429 TooManyRequests（当前未实现）
 
-**原因**：超过 API 调用速率限制
+<Warning>
+  **实现状态**：
+  - ❌ 当前 API **未实现**速率限制功能
+  - ❌ 不会返回 429 错误响应
+  - ❌ 不会设置 `Retry-After` 响应头
+  - ✅ 错误类型已定义（`TooManyRequests`），但未在代码中使用
+  - 💡 如需限流，建议在**网关层或 middleware** 实现
+</Warning>
 
-```json
+**理论响应格式**（如果实现）：
+
+```json 429 错误响应（理论） icon="flask" highlight={2-4}
 {
-  "error": "RateLimitExceeded",
-  "message": "Rate limit exceeded. Please retry after 10 seconds.",
+  "error": "TooManyRequests",
+  "message": "Rate limit exceeded",
   "statusCode": 429,
-  "retryAfter": 10,
   "correlationId": "req_jkl012"
 }
 ```
 
-**解决方案**：
+<Note>
+  **设计说明**：如果未来实现限流功能，建议通过 HTTP 响应头 `Retry-After`（单位：秒）传递重试等待时间：
+  ```
+  Retry-After: 10
+  ```
+</Note>
+
+**如果实现，建议的客户端处理策略**：
 
 - 实现指数退避重试策略
+- 读取响应头 `Retry-After` 获取建议的重试时间
 - 减少并发请求数
 - 联系销售团队提升限额
 
@@ -119,7 +196,7 @@ description: "理解和处理 API 错误"
 
 **原因**：服务器内部错误
 
-```json
+```json 500 错误响应 icon="circle-exclamation" highlight={3,5}
 {
   "error": "InternalServerError",
   "message": "An unexpected error occurred",
@@ -127,6 +204,10 @@ description: "理解和处理 API 错误"
   "correlationId": "req_mno345"
 }
 ```
+
+<Warning>
+  **重要**：遇到 500 错误时，请务必记录 `correlationId` 并联系技术支持，这将帮助快速定位问题。
+</Warning>
 
 **解决方案**：
 
@@ -137,8 +218,8 @@ description: "理解和处理 API 错误"
 ## 错误处理最佳实践
 
 <AccordionGroup>
-  <Accordion title="使用 try-catch 包裹请求">
-    ```javascript
+  <Accordion title="1️⃣ 使用 try-catch 包裹请求" icon="shield">
+    ```javascript 基础错误处理 lines icon="shield"
     try {
       const response = await fetch(url, options);
 
@@ -157,8 +238,8 @@ description: "理解和处理 API 错误"
 
   </Accordion>
 
-  <Accordion title="实现重试机制">
-    ```javascript
+  <Accordion title="2️⃣ 实现重试机制" icon="rotate">
+    ```javascript 重试机制实现 lines icon="rotate" highlight={7-10,15}
     async function fetchWithRetry(url, options, maxRetries = 3) {
       for (let i = 0; i < maxRetries; i++) {
         try {
@@ -179,23 +260,46 @@ description: "理解和处理 API 错误"
     }
     ```
 
+    <Note>
+      **关键点**：
+      - ⚠️ 当前 API **未实现** 429 限流，上述代码为**未来兼容性**保留
+      - 其他错误使用指数退避策略（2^i 秒：1s, 2s, 4s）
+      - 如果未来实现 429，建议读取 `Retry-After` 响应头
+    </Note>
+
   </Accordion>
 
-  <Accordion title="记录 correlationId">
-    ```javascript
+  <Accordion title="3️⃣ 记录 correlationId" icon="fingerprint">
+    ```javascript 记录 correlationId lines icon="fingerprint" highlight={5-9}
     const response = await fetch(url, options);
     const data = await response.json();
 
+    // 优先从响应体获取（错误响应），失败则从响应头获取（成功响应）
+    const correlationId =
+      data.correlationId ||
+      response.headers.get('X-Correlation-Id');
+
     if (!response.ok) {
-      console.error('Error correlationId:', data.correlationId);
+      console.error('Error correlationId:', correlationId);
       // 记录到日志系统，便于排查问题
+    } else {
+      console.log('Success correlationId:', correlationId);
+      // 成功请求也应记录 correlationId，便于追踪
     }
     ```
 
+    <Note>
+      **correlationId 获取方式**：
+      - **错误响应**：从响应体 `data.correlationId` 或响应头 `X-Correlation-Id` 获取（两者相同）
+      - **成功响应**：只能从响应头 `X-Correlation-Id` 获取（响应体不包含）
+      - **401 错误**：两处都不包含，无法获取 correlationId
+      - 联系技术支持时提供此 ID 可以快速定位问题
+    </Note>
+
   </Accordion>
 
-  <Accordion title="区分错误类型">
-    ```javascript
+  <Accordion title="4️⃣ 区分错误类型" icon="list-check">
+    ```javascript 错误类型处理 lines icon="list-check" highlight={2,4-6,9-11,14-16}
     function handleError(error) {
       switch (error.statusCode) {
         case 401:
@@ -207,7 +311,7 @@ description: "理解和处理 API 错误"
           showPermissionError();
           break;
         case 429:
-          // 限流提示
+          // 限流提示（当前不会触发，为未来兼容性保留）
           showRateLimitWarning();
           break;
         case 500:
@@ -219,14 +323,22 @@ description: "理解和处理 API 错误"
       }
     }
     ```
+
+    <Note>
+      **注意**：当前 API 不会返回 429 错误（未实现限流），case 429 为未来兼容性保留。
+    </Note>
   </Accordion>
 </AccordionGroup>
 
 ## 完整示例
 
+<Warning>
+  **实现状态说明**：示例代码中包含 429 限流处理逻辑，但当前 API **未实现限流功能**，不会返回 429 错误。该逻辑为**未来兼容性**保留，建议保留以便将来 API 添加限流功能时无需修改代码。
+</Warning>
+
 <CodeGroup>
 
-```javascript JavaScript
+```javascript JavaScript 完整错误处理 lines expandable icon="js" highlight={19-24,29-35,41-44}
 async function safeChat(message, options = {}) {
   const maxRetries = 3;
   let lastError = null;
@@ -246,6 +358,7 @@ async function safeChat(message, options = {}) {
         }),
       });
 
+      // 429 处理（当前不会触发，为未来兼容性保留）
       if (response.status === 429) {
         const retryAfter = parseInt(response.headers.get("Retry-After") || "5");
         console.log(`Rate limited, retrying after ${retryAfter}s`);
@@ -255,8 +368,12 @@ async function safeChat(message, options = {}) {
 
       const data = await response.json();
 
+      // 获取 correlationId：优先从响应体，失败则从响应头
+      const correlationId =
+        data.correlationId || response.headers.get("X-Correlation-Id");
+
       if (!response.ok) {
-        console.error(`Error (${data.correlationId}):`, data.message);
+        console.error(`Error (${correlationId}):`, data.message);
         throw new Error(data.message);
       }
 
@@ -284,7 +401,7 @@ try {
 }
 ```
 
-```python Python
+```python Python 完整错误处理 lines expandable icon="python" highlight={21-24,29-35,41-44}
 import requests
 import time
 
@@ -307,6 +424,7 @@ def safe_chat(message, options=None, max_retries=3):
         try:
             response = requests.post(url, json=payload, headers=headers)
 
+            # 429 处理（当前不会触发，为未来兼容性保留）
             if response.status_code == 429:
                 retry_after = int(response.headers.get('Retry-After', 5))
                 print(f"Rate limited, retrying after {retry_after}s")
@@ -315,8 +433,14 @@ def safe_chat(message, options=None, max_retries=3):
 
             data = response.json()
 
+            # 获取 correlationId：优先从响应体，失败则从响应头
+            correlation_id = (
+                data.get('correlationId') or
+                response.headers.get('X-Correlation-Id')
+            )
+
             if not response.ok:
-                print(f"Error ({data.get('correlationId')}): {data.get('message')}")
+                print(f"Error ({correlation_id}): {data.get('message')}")
                 raise Exception(data.get('message'))
 
             return data
@@ -340,11 +464,31 @@ except Exception as error:
 
 </CodeGroup>
 
+<Note>
+  **完整示例特点**：
+  - ⚠️ 包含 429 限流处理（当前未实现，为未来兼容性保留）
+  - ✅ 网络错误等使用指数退避重试（1s, 2s, 4s）
+  - ✅ 正确获取 `correlationId`：优先从响应体，失败则从响应头 `X-Correlation-Id`
+  - ✅ 记录 `correlationId` 便于问题追踪
+  - ✅ 最多重试 3 次后抛出最后一次的错误
+  - 💡 建议保留 429 处理逻辑，以便 API 未来添加限流时无需修改代码
+</Note>
+
 ## 调试技巧
+
+<Note>
+  **关于成功响应的 correlationId**：
+
+  成功响应（200 OK）的响应体中**不包含** `correlationId` 字段，但响应头中**包含** `X-Correlation-Id`。建议在所有请求（成功或失败）中记录此响应头，便于追踪完整的请求链路。
+
+  **获取方式**：
+  - JavaScript: `response.headers.get('X-Correlation-Id')`
+  - Python (requests): `response.headers.get('X-Correlation-Id')`
+</Note>
 
 <CardGroup cols={2}>
   <Card title="记录 correlationId" icon="fingerprint">
-    保存每个请求的 `correlationId`，便于问题排查
+    保存每个请求的 `correlationId`（响应体或响应头），便于问题排查
   </Card>
 
 {" "}

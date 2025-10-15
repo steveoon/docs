@@ -246,7 +246,7 @@ Use **summary tables** before details:
 
 #### Example: Request/Response Pairs Pattern
 
-```mdx
+````mdx
 <AccordionGroup>
   <Accordion title="error 策略（默认）" icon="circle-exclamation">
     <CodeGroup>
@@ -260,7 +260,7 @@ Use **summary tables** before details:
   </Accordion>
   [更多策略折叠]
 </AccordionGroup>
-```
+````
 
 ### Code Block Enhancement Guidelines
 
@@ -268,7 +268,7 @@ Use **summary tables** before details:
 
 #### Basic Enhancement
 
-```mdx
+````mdx
 # ❌ Bad: Plain code block
 ```json
 { "model": "..." }
@@ -278,7 +278,7 @@ Use **summary tables** before details:
 ```json 请求示例 icon="paper-plane"
 { "model": "..." }
 ```
-```
+````
 
 #### When to Use Each Feature
 
@@ -312,7 +312,7 @@ Choose semantic icons that match the content type:
 
 #### Highlighting Patterns
 
-```mdx
+````mdx
 # Single line emphasis
 ```json 示例 highlight={3}
 {
@@ -341,12 +341,12 @@ Choose semantic icons that match the content type:
   "details": {...}
 }
 ```
-```
+````
 
 #### CodeGroup Usage Patterns
 
 **Request/Response Pairs:**
-```mdx
+````mdx
 <CodeGroup>
   ```bash 请求 icon="terminal"
   curl -X GET https://api.example.com/endpoint
@@ -359,10 +359,10 @@ Choose semantic icons that match the content type:
   }
   ```
 </CodeGroup>
-```
+````
 
 **Multi-language Examples:**
-```mdx
+````mdx
 <CodeGroup>
   ```javascript JavaScript icon="js"
   const response = await fetch(url);
@@ -376,7 +376,7 @@ Choose semantic icons that match the content type:
   curl -X GET url
   ```
 </CodeGroup>
-```
+````
 
 #### Complete Enhancement Examples
 

@@ -45,33 +45,95 @@ description: "智能管理对话历史，优化 Token 使用"
 
 通过 `pruneOptions` 自定义剪裁行为：
 
-```json
+```json 自定义剪裁配置 icon="sliders"
 {
   "prune": true,
   "pruneOptions": {
-    "maxOutputTokens": 15000,
-    "targetTokens": 8000,
-    "preserveRecentMessages": 2
+    "targetTokens": 60000,
+    "preserveRecentMessages": 5
   }
 }
 ```
 
+<Note>
+  **重要**：如果不设置 `pruneOptions`，系统使用默认值（`targetTokens: 80000`），适用于大多数场景。只有在需要更激进的剪裁时才需要自定义配置。
+</Note>
+
 ### 参数说明
 
-| 参数                     | 默认值 | 说明                          |
-| ------------------------ | ------ | ----------------------------- |
-| `maxOutputTokens`        | 15000  | 预留给模型输出的最大 Token 数 |
-| `targetTokens`           | 8000   | 剪裁后的目标 Token 总数       |
-| `preserveRecentMessages` | 2      | 始终保留的最新消息数量        |
+| 参数                     | 类型     | 默认值 | 说明                                                                 |
+| ------------------------ | -------- | ------ | -------------------------------------------------------------------- |
+| `targetTokens`           | `number` | 80000  | 触发剪裁的阈值。当消息总 Token 数超过此值时，会执行剪裁优化          |
+| `maxOutputTokens`        | `number` | 100000 | 剪裁后消息的绝对上限（超过会警告但不阻止）                           |
+| `preserveRecentMessages` | `number` | 3      | 始终保留的最新消息数量（确保对话连贯性，建议至少保留 3 条最新消息） |
+
+<Warning>
+  **参数理解**：
+  - `targetTokens`：小于此值不会触发剪裁，大于此值才开始优化
+  - `maxOutputTokens`：剪裁的最终目标上限，但不是硬性限制
+  - `preserveRecentMessages`：无论如何都会保留的消息数，设置过小可能影响对话连贯性
+</Warning>
 
 ## 剪裁策略
 
-系统采用智能剪裁策略：
+系统会根据消息历史的特征**自动选择最合适的优化策略**：
 
-1. **保留最近消息**：最近的 N 条消息始终保留
-2. **移除中间消息**：从较早的消息开始移除
-3. **保留系统消息**：系统提示词始终保留
-4. **保持完整性**：确保 user/assistant 消息对的完整性
+<AccordionGroup>
+  <Accordion title="gentle_optimization - 温和优化（常用）" icon="feather">
+    **适用场景**：消息总数适中，仅需轻度优化
+
+    **策略**：
+    - 保留最近的 N 条消息（由 `preserveRecentMessages` 控制）
+    - 从较早的消息开始逐步移除
+    - 确保 user/assistant 消息对的完整性
+    - 系统提示词始终保留
+
+  </Accordion>
+
+  <Accordion title="aggressive_image_removal - 激进的图片移除" icon="image">
+    **适用场景**：消息中包含大量图片或文件附件
+
+    **策略**：
+    - 优先移除历史消息中的图片和文件 part
+    - 保留文本内容以维持对话连贯性
+    - 显著降低 Token 消耗（图片占用大量 tokens）
+
+  </Accordion>
+
+  <Accordion title="hybrid_optimization - 混合优化" icon="layer-group">
+    **适用场景**：消息历史既长又包含附件
+
+    **策略**：
+    - 结合移除旧消息和移除附件
+    - 平衡对话历史和 Token 消耗
+    - 根据消息重要性动态调整
+
+  </Accordion>
+
+  <Accordion title="aggressive_truncation - 激进截断" icon="scissors">
+    **适用场景**：消息总数远超阈值，需要大幅减少
+
+    **策略**：
+    - 仅保留最近的核心消息
+    - 移除大部分历史对话
+    - 优先保证响应速度和成本
+
+  </Accordion>
+
+  <Accordion title="minimal_cleanup - 最小清理" icon="broom">
+    **适用场景**：消息总数略超阈值
+
+    **策略**：
+    - 最小化的调整
+    - 仅移除少量最早的消息
+    - 最大程度保留上下文
+
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  **自动策略选择**：您无需手动选择策略，系统会根据消息历史的长度、内容类型（是否包含图片）、Token 总数等因素自动选择最优策略。
+</Tip>
 
 ## 检查剪裁结果
 
@@ -83,117 +145,302 @@ X-Message-Pruned: true
 
 ## 完整示例
 
-<CodeGroup>
+<Tabs>
+  <Tab title="使用默认配置（推荐）">
+    大多数情况下，使用默认配置即可：
 
-```javascript JavaScript
-const response = await fetch("https://huajune.duliday.com/api/v1/chat", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${apiKey}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    model: "anthropic/claude-3-7-sonnet-20250219",
-    messages: longConversationHistory, // 很长的对话历史
-    prune: true,
-    pruneOptions: {
-      maxOutputTokens: 15000,
-      targetTokens: 8000,
-      preserveRecentMessages: 3,
-    },
-    stream: false,
-  }),
-});
+    <CodeGroup>
+      ```javascript JavaScript icon="js"
+      const response = await fetch("https://huajune.duliday.com/api/v1/chat", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "anthropic/claude-3-7-sonnet-20250219",
+          messages: longConversationHistory, // 对话历史
+          prune: true, // 仅启用剪裁，使用默认配置
+          stream: false,
+        }),
+      });
 
-// 检查是否进行了剪裁
-const isPruned = response.headers.get("X-Message-Pruned") === "true";
-if (isPruned) {
-  console.log("消息已剪裁以优化成本");
-}
-```
+      // 检查是否进行了剪裁
+      const isPruned = response.headers.get("X-Message-Pruned") === "true";
+      if (isPruned) {
+        console.log("消息已剪裁以优化成本");
+      }
 
-```python Python
-import requests
+      const data = await response.json();
+      console.log(`输入 tokens: ${data.data.usage.inputTokens}`);
+      ```
 
-url = "https://huajune.duliday.com/api/v1/chat"
-headers = {
-    "Authorization": f"Bearer {api_key}",
-    "Content-Type": "application/json"
-}
-payload = {
-    "model": "anthropic/claude-3-7-sonnet-20250219",
-    "messages": long_conversation_history,  # 很长的对话历史
-    "prune": True,
-    "pruneOptions": {
-        "maxOutputTokens": 15000,
-        "targetTokens": 8000,
-        "preserveRecentMessages": 3
-    },
-    "stream": False
-}
+      ```python Python icon="python"
+      import requests
 
-response = requests.post(url, json=payload, headers=headers)
+      url = "https://huajune.duliday.com/api/v1/chat"
+      headers = {
+          "Authorization": f"Bearer {api_key}",
+          "Content-Type": "application/json"
+      }
+      payload = {
+          "model": "anthropic/claude-3-7-sonnet-20250219",
+          "messages": long_conversation_history,
+          "prune": True,  # 仅启用剪裁，使用默认配置
+          "stream": False
+      }
 
-# 检查是否进行了剪裁
-is_pruned = response.headers.get('X-Message-Pruned') == 'true'
-if is_pruned:
-    print('消息已剪裁以优化成本')
-```
+      response = requests.post(url, json=payload, headers=headers)
 
-</CodeGroup>
+      # 检查是否进行了剪裁
+      is_pruned = response.headers.get('X-Message-Pruned') == 'true'
+      if is_pruned:
+          print('消息已剪裁以优化成本')
+
+      data = response.json()
+      print(f"输入 tokens: {data['data']['usage']['inputTokens']}")
+      ```
+    </CodeGroup>
+
+    <Note>
+      **默认配置**：`targetTokens: 80000`, `preserveRecentMessages: 3`。这适用于绝大多数场景，无需手动调整。
+    </Note>
+
+  </Tab>
+
+  <Tab title="自定义配置（更激进的剪裁）">
+    如果需要更激进的剪裁（例如成本敏感型应用）：
+
+    <CodeGroup>
+      ```javascript JavaScript icon="js"
+      const response = await fetch("https://huajune.duliday.com/api/v1/chat", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "anthropic/claude-3-7-sonnet-20250219",
+          messages: longConversationHistory,
+          prune: true,
+          pruneOptions: {
+            targetTokens: 50000,        // 降低阈值，更早触发剪裁
+            preserveRecentMessages: 5,  // 保留更多最新消息以维持连贯性
+          },
+          stream: false,
+        }),
+      });
+
+      const isPruned = response.headers.get("X-Message-Pruned") === "true";
+      const data = await response.json();
+
+      console.log(`剪裁状态: ${isPruned ? "已剪裁" : "未剪裁"}`);
+      console.log(`输入 tokens: ${data.data.usage.inputTokens}`);
+      console.log(`输出 tokens: ${data.data.usage.outputTokens}`);
+      ```
+
+      ```python Python icon="python"
+      import requests
+
+      url = "https://huajune.duliday.com/api/v1/chat"
+      headers = {
+          "Authorization": f"Bearer {api_key}",
+          "Content-Type": "application/json"
+      }
+      payload = {
+          "model": "anthropic/claude-3-7-sonnet-20250219",
+          "messages": long_conversation_history,
+          "prune": True,
+          "pruneOptions": {
+              "targetTokens": 50000,        # 降低阈值，更早触发剪裁
+              "preserveRecentMessages": 5   # 保留更多最新消息
+          },
+          "stream": False
+      }
+
+      response = requests.post(url, json=payload, headers=headers)
+      is_pruned = response.headers.get('X-Message-Pruned') == 'true'
+      data = response.json()
+
+      print(f"剪裁状态: {'已剪裁' if is_pruned else '未剪裁'}")
+      print(f"输入 tokens: {data['data']['usage']['inputTokens']}")
+      print(f"输出 tokens: {data['data']['usage']['outputTokens']}")
+      ```
+    </CodeGroup>
+
+    <Warning>
+      **自定义配置注意事项**：
+      - `targetTokens` 设置过低会导致频繁剪裁，可能影响对话质量
+      - `preserveRecentMessages` 建议至少保留 3-5 条消息
+      - 建议先使用默认配置，根据实际效果再调整
+    </Warning>
+
+  </Tab>
+</Tabs>
 
 ## 最佳实践
 
 <AccordionGroup>
-  <Accordion title="根据场景调整参数">
-    不同场景使用不同的剪裁参数：
+  <Accordion title="1️⃣ 根据场景调整参数" icon="sliders">
+    不同场景使用不同的剪裁配置：
 
-    - **长对话**：`targetTokens: 6000`, `preserveRecentMessages: 5`
-    - **短对话**：禁用剪裁或使用较大的 `targetTokens`
-    - **成本敏感**：`targetTokens: 5000`, `preserveRecentMessages: 2`
+    <CodeGroup>
+      ```json 长对话场景 icon="comments"
+      {
+        "prune": true,
+        "pruneOptions": {
+          "targetTokens": 60000,
+          "preserveRecentMessages": 8
+        }
+      }
+      ```
+
+      ```json 成本敏感场景 icon="dollar-sign"
+      {
+        "prune": true,
+        "pruneOptions": {
+          "targetTokens": 40000,
+          "preserveRecentMessages": 5
+        }
+      }
+      ```
+
+      ```json 短对话场景 icon="message"
+      {
+        "prune": true
+        // 使用默认配置即可，或完全禁用剪裁
+      }
+      ```
+    </CodeGroup>
+
+    <Tip>
+      **推荐策略**：
+      - 默认配置适用于大多数场景（80000 tokens 阈值）
+      - 只有在明确需要更激进的成本控制时才降低 `targetTokens`
+      - `preserveRecentMessages` 建议保持在 3-8 之间
+    </Tip>
 
   </Accordion>
 
-  <Accordion title="监控剪裁效果">
-    记录剪裁前后的消息数量：
+  <Accordion title="2️⃣ 监控剪裁效果" icon="chart-line">
+    记录剪裁前后的消息数量和 Token 变化：
 
-    ```javascript
+    ```javascript 监控剪裁效果 lines icon="chart-line"
     const originalLength = messages.length;
+    const estimatedTokens = messages.length * 100; // 粗略估算
 
-    // 发送请求...
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { /* ... */ },
+      body: JSON.stringify({
+        messages,
+        prune: true,
+        pruneOptions: { targetTokens: 50000 }
+      })
+    });
 
-    const isPruned = response.headers.get('X-Message-Pruned');
-    if (isPruned) {
-      console.log(`消息数从 ${originalLength} 条优化`);
-    }
+    const isPruned = response.headers.get('X-Message-Pruned') === 'true';
+    const data = await response.json();
+
+    console.log('剪裁统计:');
+    console.log(`  - 原始消息数: ${originalLength} 条`);
+    console.log(`  - 是否剪裁: ${isPruned ? '是' : '否'}`);
+    console.log(`  - 实际输入 tokens: ${data.data.usage.inputTokens}`);
+    console.log(`  - 节省比例: ${isPruned ?
+      Math.round((1 - data.data.usage.inputTokens / estimatedTokens) * 100) : 0}%`);
     ```
 
   </Accordion>
 
-  <Accordion title="结合 Token 统计">
-    使用返回的 `usage` 信息监控 Token 消耗：
+  <Accordion title="3️⃣ 结合 Token 统计优化成本" icon="calculator">
+    使用返回的 `usage` 信息监控和优化成本：
 
-    ```javascript
+    ```javascript Token 成本监控 lines icon="dollar-sign"
+    const response = await fetch(url, { /* ... */ });
     const data = await response.json();
     const { inputTokens, outputTokens, totalTokens } = data.data.usage;
 
-    console.log(`输入: ${inputTokens}, 输出: ${outputTokens}, 总计: ${totalTokens}`);
+    // 计算成本（以 Claude 3.7 Sonnet 为例）
+    const INPUT_COST_PER_1M = 3.0;   // $3 per 1M input tokens
+    const OUTPUT_COST_PER_1M = 15.0; // $15 per 1M output tokens
+
+    const inputCost = (inputTokens / 1_000_000) * INPUT_COST_PER_1M;
+    const outputCost = (outputTokens / 1_000_000) * OUTPUT_COST_PER_1M;
+    const totalCost = inputCost + outputCost;
+
+    console.log(`Token 使用情况:`);
+    console.log(`  输入: ${inputTokens} tokens (\$${inputCost.toFixed(4)})`);
+    console.log(`  输出: ${outputTokens} tokens (\$${outputCost.toFixed(4)})`);
+    console.log(`  总计: ${totalTokens} tokens (\$${totalCost.toFixed(4)})`);
+
+    // 如果成本过高，考虑调整 targetTokens
+    if (inputTokens > 70000) {
+      console.warn('⚠️ 输入 tokens 较高，建议降低 targetTokens 参数');
+    }
     ```
+
+    <Note>
+      **成本优化建议**：
+      - 定期监控每次请求的 Token 使用量
+      - 如果输入 tokens 持续偏高，考虑降低 `targetTokens`
+      - 平衡成本与对话质量，避免过度剪裁
+    </Note>
 
   </Accordion>
 
-  <Accordion title="渐进式剪裁">
-    对于特别长的对话，可以分阶段剪裁：
+  <Accordion title="4️⃣ 动态调整剪裁策略" icon="gauge">
+    根据实际使用情况动态调整剪裁参数：
 
-    ```javascript
-    // 第一阶段：保守剪裁
-    let response = await chat(messages, { targetTokens: 10000 });
+    ```javascript 动态调整策略 lines icon="gauge"
+    async function chatWithAdaptivePruning(messages) {
+      // 根据消息数量动态决定是否需要剪裁
+      const messageCount = messages.length;
 
-    // 如果仍然太长，再次剪裁
-    if (response.data.usage.inputTokens > 12000) {
-      response = await chat(messages, { targetTokens: 7000 });
+      let pruneConfig = {
+        prune: false  // 默认不剪裁
+      };
+
+      if (messageCount > 100) {
+        // 超长对话：更激进的剪裁
+        pruneConfig = {
+          prune: true,
+          pruneOptions: {
+            targetTokens: 45000,
+            preserveRecentMessages: 10
+          }
+        };
+      } else if (messageCount > 50) {
+        // 长对话：启用剪裁
+        pruneConfig = {
+          prune: true,
+          pruneOptions: {
+            targetTokens: 60000,
+            preserveRecentMessages: 8
+          }
+        };
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { /* ... */ },
+        body: JSON.stringify({
+          model: "anthropic/claude-3-7-sonnet-20250219",
+          messages,
+          ...pruneConfig,
+          stream: false
+        })
+      });
+
+      return response.json();
     }
     ```
+
+    <Tip>
+      **动态策略优势**：
+      - 短对话无需剪裁，保持完整上下文
+      - 长对话自动优化，降低成本
+      - 根据业务场景灵活调整
+    </Tip>
 
   </Accordion>
 </AccordionGroup>
@@ -201,22 +448,51 @@ if is_pruned:
 ## 注意事项
 
 <Warning>
+  **剪裁的权衡考虑**：
+
   剪裁会移除部分对话历史，可能影响：
-  - 对早期内容的引用
-  - 需要完整上下文的任务
-  - 多轮复杂推理
+  - 对早期内容的引用（AI 无法访问已删除的消息）
+  - 需要完整上下文的任务（如长篇文档分析）
+  - 多轮复杂推理（依赖历史推理步骤）
 
-建议在关键对话中谨慎使用剪裁功能。
-
+  **建议**：
+  - 在成本敏感的场景中优先使用剪裁
+  - 关键对话或需要完整上下文的任务中谨慎使用
+  - 通过 `preserveRecentMessages` 保留足够的最新消息（建议 ≥ 3）
 </Warning>
 
 ## 性能对比
 
-| 场景           | 不剪裁         | 启用剪裁      | 节省 |
-| -------------- | -------------- | ------------- | ---- |
-| 100 条消息对话 | ~25,000 tokens | ~8,000 tokens | 68%  |
-| 50 条消息对话  | ~12,000 tokens | ~6,000 tokens | 50%  |
-| 20 条消息对话  | ~5,000 tokens  | 无需剪裁      | -    |
+以下是使用**自定义激进配置**（`targetTokens: 40000`）的性能对比：
+
+| 场景                | 不剪裁           | 启用剪裁（激进） | 节省 |
+| ------------------- | ---------------- | ---------------- | ---- |
+| 100 条消息对话      | ~25,000 tokens   | ~10,000 tokens   | 60%  |
+| 50 条消息对话       | ~12,000 tokens   | ~8,000 tokens    | 33%  |
+| 20 条消息对话       | ~5,000 tokens    | 无需剪裁         | -    |
+| 包含图片的 50 条对话 | ~45,000 tokens   | ~15,000 tokens   | 67%  |
+
+<Note>
+  **说明**：
+  - 上表基于 `targetTokens: 40000` 的自定义配置，非默认值
+  - 使用**默认配置**（`targetTokens: 80000`）时，100 条消息对话（~25k tokens）不会触发剪裁
+  - 图片和文件附件占用大量 tokens，使用 `aggressive_image_removal` 策略可显著降低成本
+  - 实际节省比例取决于消息长度、内容类型和配置参数
+</Note>
+
+### 成本节省示例
+
+以 Claude 3.7 Sonnet 为例（输入 \$3/1M tokens，输出 \$15/1M tokens）：
+
+| 场景         | 原始成本    | 剪裁后成本  | 节省金额    |
+| ------------ | ----------- | ----------- | ----------- |
+| 1000 次调用  | \$75.00      | \$30.00      | \$45.00 (60%) |
+| 10000 次调用 | \$750.00     | \$300.00     | \$450.00     |
+| 100万次调用  | \$75,000.00  | \$30,000.00  | \$45,000.00  |
+
+<Tip>
+  对于高频调用的应用，启用消息剪裁可以显著降低 API 成本，特别是在长对话和包含附件的场景中。
+</Tip>
 
 ## 下一步
 

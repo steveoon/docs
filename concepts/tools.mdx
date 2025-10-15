@@ -1,32 +1,35 @@
 ---
 title: "工具系统"
-description: "让 AI 调用外部工具完成复杂任务"
+description: "了解花卷智能体的工具系统和可用工具"
 ---
 
 ## 什么是工具？
 
 工具（Tools）允许 AI 模型调用外部功能来完成单纯文本生成无法完成的任务，如执行代码、查询数据库、生成特定格式的回复等。
 
+<Note>
+  **关键特性**：花卷智能体 API 采用**服务端自动执行**模式，一次请求即可完成工具调用和结果处理，无需客户端多轮交互。详见[工具调用功能](/features/tool-calling)。
+</Note>
+
 ## 查看可用工具
 
-使用 `GET /api/v1/tools` 端点查询可用工具：
+使用 `GET /api/v1/tools` 端点查询当前可用的工具列表：
 
-```bash
+<CodeGroup>
+```bash 查询可用工具 icon="terminal"
 curl -X GET https://huajune.duliday.com/api/v1/tools \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
-响应示例：
-
-```json
+```json 响应示例 lines icon="check"
 {
   "success": true,
   "data": {
     "tools": [
       {
         "name": "bash",
-        "requiresSandbox": false,
-        "requiredContext": []
+        "requiresSandbox": true,
+        "requiredContext": ["sandboxId"]
       },
       {
         "name": "zhipin_reply_generator",
@@ -37,114 +40,267 @@ curl -X GET https://huajune.duliday.com/api/v1/tools \
   }
 }
 ```
+</CodeGroup>
+
+<Tip>
+  查看每个工具的 `requiredContext` 字段，了解调用该工具需要提供哪些上下文数据。
+</Tip>
 
 ## 内置工具
 
-### bash
-
-执行 Bash 命令，适用于文件操作、系统命令等场景。
-
-**所需上下文**：无
-
-**示例**：
-
-```json
-{
-  "allowedTools": ["bash"]
-}
-```
-
 ### zhipin_reply_generator
 
-生成 BOSS 直聘招聘回复，用于自动化候选人沟通。
+**用途**：生成 BOSS 直聘专业招聘回复，用于自动化候选人沟通。
 
 **所需上下文**：
+- `configData`: 品牌配置数据（包含公司信息、岗位模板等）
+- `replyPrompts`: 回复提示词配置（不同场景的回复策略）
 
-- `configData`: 品牌配置数据
-- `replyPrompts`: 回复提示词配置
+**典型场景**：
+- 回答候选人关于薪资、福利、工作时间等问题
+- 自动生成专业、友好的招聘沟通话术
+- 根据品牌配置定制回复内容
 
-**示例**：详见[工具调用功能](/features/tool-calling)
-
-## 启用工具
-
-在请求中使用 `allowedTools` 数组指定要启用的工具：
-
-```json
-{
-  "model": "anthropic/claude-3-7-sonnet-20250219",
-  "messages": [...],
-  "allowedTools": ["bash", "zhipin_reply_generator"]
-}
-```
-
-<Note>
-  如果不指定 `allowedTools` 或传入空数组，则不启用任何工具（纯文本对话）。
-</Note>
-
-## 工具上下文
-
-某些工具需要额外的上下文信息才能正常工作。通过 `context` 和 `toolContext` 提供：
-
-```json
+**示例**：
+```json 基础配置 icon="message-bot"
 {
   "allowedTools": ["zhipin_reply_generator"],
   "context": {
-    "configData": { ... },
-    "replyPrompts": { ... }
-  },
-  "toolContext": {
-    "zhipin_reply_generator": {
-      "replyPrompts": { "custom_key": "custom_value" }
+    "preferredBrand": "蜀地源冒菜",
+    "configData": {
+      "city": "上海",
+      "brands": {
+        "蜀地源冒菜": {
+          "templates": { /* 岗位模板 */ }
+        }
+      }
+    },
+    "replyPrompts": {
+      "general_chat": "礼貌、专业地回复候选人"
     }
   }
 }
 ```
 
-<Tip>`toolContext` 中的配置会覆盖顶层 `context` 中的同名字段。</Tip>
+<Card
+  title="查看完整示例"
+  icon="code"
+  href="/features/tool-calling"
+>
+  在工具调用功能文档中查看详细的配置示例和代码
+</Card>
 
-## 上下文策略
+---
 
-使用 `contextStrategy` 参数控制缺失上下文时的行为：
+### bash
 
-| 策略            | 行为                           |
-| --------------- | ------------------------------ |
-| `error`（默认） | 返回 400 错误，列出缺失字段    |
-| `skip`          | 跳过无法实例化的工具，继续执行 |
-| `report`        | 仅返回验证报告，不执行请求     |
+**用途**：执行 Bash 命令，适用于文件操作、系统命令、代码执行等场景。
 
-示例：
+**所需上下文**：
+- `sandboxId`: E2B 沙盒环境 ID（必需）
 
-```json
+<Warning>
+  **重要**：bash 工具需要在 E2B 沙盒环境中运行，确保安全隔离。使用前需要：
+  1. 创建 E2B 沙盒客户端
+  2. 在 `context.sandboxId` 中提供沙盒 ID
+
+  如果没有沙盒环境，工具将无法工作。
+</Warning>
+
+**示例**：
+```json bash 工具配置 icon="terminal"
 {
-  "allowedTools": ["zhipin_reply_generator"],
-  "contextStrategy": "skip"
+  "allowedTools": ["bash"],
+  "context": {
+    "sandboxId": "your_e2b_sandbox_id"
+  }
 }
 ```
 
-## 验证模式
+<Note>
+  **推荐**：对于招聘业务场景，建议使用 `zhipin_reply_generator` 等业务工具，而非 bash 工具。
+</Note>
 
-使用 `validateOnly: true` 进行"干跑"，检查工具配置是否正确：
+## 工具配置要素
 
-```json
+### 启用工具
+
+通过 `allowedTools` 数组指定要启用的工具：
+
+```json 启用单个工具 icon="check"
+{
+  "allowedTools": ["zhipin_reply_generator"]
+}
+```
+
+```json 启用多个工具 icon="check"
+{
+  "allowedTools": ["bash", "zhipin_reply_generator"]
+}
+```
+
+<Note>
+  如果不指定 `allowedTools` 或传入空数组，则不启用任何工具（纯文本对话模式）。
+</Note>
+
+### 工具上下文
+
+某些工具需要额外的上下文信息才能正常工作。通过 `context` 字段提供：
+
+<Tabs>
+  <Tab title="全局上下文">
+    使用 `context` 提供所有工具共享的上下文：
+
+    ```json 全局配置 icon="globe"
+    {
+      "context": {
+        "configData": { /* 品牌配置 */ },
+        "replyPrompts": { /* 回复策略 */ },
+        "preferredBrand": "蜀地源冒菜"
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="工具级上下文">
+    使用 `toolContext` 为特定工具提供上下文，会**覆盖**全局 `context`：
+
+    ```json 工具级配置 icon="layer-group"
+    {
+      "context": {
+        "replyPrompts": { "default": "默认策略" }
+      },
+      "toolContext": {
+        "zhipin_reply_generator": {
+          "replyPrompts": { "custom": "自定义策略" }  // 优先使用
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  详细的上下文配置请参考[上下文管理文档](/concepts/context)。
+</Tip>
+
+### 上下文策略
+
+使用 `contextStrategy` 参数控制缺失必需上下文时的行为：
+
+| 策略 | 行为 | 适用场景 |
+|------|------|---------|
+| `error`（默认） | 返回 400 错误，列出缺失字段 | 确保工具配置正确 |
+| `skip` | 跳过无法实例化的工具，继续执行 | 可选工具，部分失败不影响主流程 |
+| `report` | 仅返回验证报告，不执行请求 | 预检工具配置 |
+
+<Accordion title="策略使用示例" icon="sliders">
+  ```json skip 策略示例
+  {
+    "allowedTools": ["bash", "zhipin_reply_generator"],
+    "contextStrategy": "skip"  // 跳过无法初始化的工具
+  }
+  ```
+
+  ```json report 策略示例
+  {
+    "allowedTools": ["zhipin_reply_generator"],
+    "contextStrategy": "report"  // 仅验证，不执行
+  }
+  ```
+</Accordion>
+
+### 验证模式
+
+使用 `validateOnly: true` 进行"干跑"，检查工具配置是否正确，而不实际执行对话：
+
+```json 验证配置 icon="clipboard-check"
 {
   "model": "anthropic/claude-3-7-sonnet-20250219",
   "messages": [...],
   "allowedTools": ["zhipin_reply_generator"],
-  "validateOnly": true
+  "context": { ... },
+  "validateOnly": true  // 仅验证，不执行
 }
 ```
 
-返回验证报告而不实际执行对话。
+<Tip>
+  验证模式等价于 `contextStrategy: "report"`，用于调试工具配置问题。
+</Tip>
+
+## 工具对比
+
+<AccordionGroup>
+  <Accordion title="zhipin_reply_generator - 招聘回复生成" icon="message-bot">
+    **最佳实践**：
+    - ✅ 自动回复候选人咨询
+    - ✅ 生成专业招聘话术
+    - ✅ 根据品牌定制回复风格
+    - ✅ 处理薪资、福利、工作时间等常见问题
+
+    **限制**：
+    - 需要完整的 `configData` 和 `replyPrompts` 配置
+    - 仅适用于 BOSS 直聘招聘场景
+
+    **推荐使用场景**：蓝领招聘自动化、候选人沟通
+  </Accordion>
+
+  <Accordion title="bash - 命令执行" icon="terminal">
+    **最佳实践**：
+    - ✅ 执行系统命令
+    - ✅ 文件操作
+    - ✅ 代码执行和测试
+
+    **限制**：
+    - ❌ 需要 E2B 沙盒环境（额外配置）
+    - ❌ 不适合业务逻辑处理
+    - ❌ 安全风险需要隔离环境
+
+    **推荐使用场景**：开发测试、系统管理（需要沙盒）
+  </Accordion>
+</AccordionGroup>
+
+## 执行模式
+
+花卷智能体 API 采用**服务端自动执行**模式：
+
+```
+用户 → API (一次请求)
+    ↓
+1. AI 决定需要调用工具
+    ↓
+2. 服务端自动执行工具
+    ↓
+3. AI 理解工具结果
+    ↓
+4. 生成最终回复
+    ↓
+API → 用户 (完整的对话历史)
+```
+
+**优点**：
+- ✅ 单次请求完成
+- ✅ 无需客户端处理工具执行
+- ✅ 自动重试和错误处理
+- ✅ 完整的执行历史
+
+<Card
+  title="查看完整工作流程"
+  icon="diagram-project"
+  href="/features/tool-calling#工具调用流程"
+>
+  了解服务端自动执行的详细流程和响应结构
+</Card>
 
 ## 下一步
 
 <CardGroup cols={2}>
   <Card
-    title="工具调用示例"
+    title="工具调用实践"
     icon="code"
     href="/features/tool-calling"
   >
-    查看完整的工具调用示例代码
+    查看完整的工具调用示例和代码
   </Card>
 
   <Card
@@ -152,6 +308,22 @@ curl -X GET https://huajune.duliday.com/api/v1/tools \
     icon="gear"
     href="/concepts/context"
   >
-    深入了解上下文配置
+    深入了解上下文配置和验证
+  </Card>
+
+  <Card
+    title="消息格式"
+    icon="message"
+    href="/concepts/messages"
+  >
+    了解工具调用的消息结构
+  </Card>
+
+  <Card
+    title="API 端点详解"
+    icon="book"
+    href="/api-reference/endpoint/chat"
+  >
+    查看完整的 API 参数文档
   </Card>
 </CardGroup>

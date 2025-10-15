@@ -11,14 +11,14 @@ description: "了解花卷智能体支持的 AI 模型及如何选择"
 
 使用 `GET /api/v1/models` 端点查询你账户可用的所有模型：
 
-```bash
+```bash 查询可用模型 icon="terminal"
 curl -X GET https://huajune.duliday.com/api/v1/models \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 响应示例：
 
-```json
+```json 响应示例 lines icon="check"
 {
   "success": true,
   "data": {
@@ -31,12 +31,21 @@ curl -X GET https://huajune.duliday.com/api/v1/models \
       {
         "id": "openai/gpt-4o",
         "name": "GPT-4o",
-        "categories": ["chat", "vision"]
+        "categories": ["general"]
+      },
+      {
+        "id": "qwen/qwen-max-latest",
+        "name": "Qwen Max",
+        "categories": ["general"]
       }
     ]
   }
 }
 ```
+
+<Note>
+  **categories** 字段表示模型的分类标签，当前支持：`"chat"`（对话优化）和 `"general"`（通用能力）。
+</Note>
 
 ## 模型 ID 格式
 
@@ -64,15 +73,21 @@ curl -X GET https://huajune.duliday.com/api/v1/models \
     - 适合生产环境
   </Card>
 
-{" "}
-<Card title="GPT-4o" icon="sparkles">
-  **推荐场景**：多模态任务、视觉理解 - 支持图像输入 - 响应速度快 - 通用能力强
-</Card>
+  <Card title="GPT-4o" icon="sparkles">
+    **推荐场景**：通用对话、快速响应任务
 
-{" "}
-<Card title="Qwen Max" icon="bolt">
-  **推荐场景**：中文场景、成本敏感应用 - 中文能力优秀 - 性价比高 - 响应速度快
-</Card>
+    - 通用能力强
+    - 响应速度快
+    - 适合多样化场景
+  </Card>
+
+  <Card title="Qwen Max" icon="bolt">
+    **推荐场景**：中文场景、成本敏感应用
+
+    - 中文能力优秀
+    - 性价比高
+    - 响应速度快
+  </Card>
 
   <Card title="Qwen Plus" icon="zap">
     **推荐场景**：高频调用、开发测试
@@ -87,7 +102,7 @@ curl -X GET https://huajune.duliday.com/api/v1/models \
 
 在 `POST /api/v1/chat` 请求中使用 `model` 参数：
 
-```json
+```json 请求示例 icon="paper-plane"
 {
   "model": "anthropic/claude-3-7-sonnet-20250219",
   "messages": [
