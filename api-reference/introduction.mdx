@@ -125,19 +125,19 @@ Content-Type: application/json
 }
 ```
 
+<Note>
+  **correlationId 说明**：
+  - 大多数错误（400, 403, 500等）在响应体和响应头中都包含 correlationId
+  - 401 认证错误**不包含** correlationId（既不在响应体也不在响应头）
+</Note>
+
 详见 [错误处理](/features/error-handling)
 
 ## 速率限制
 
-API 调用受速率限制保护,具体限额取决于你的订阅计划。超出限制时会返回 `429 Too Many Requests` 错误。
-
-响应头中包含限流信息:
-
-```http
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 99
-X-RateLimit-Reset: 1609459200
-```
+<Warning>
+  **当前状态**：API 目前**未实现**速率限制功能,不会返回 429 错误或相关响应头。如需限流,建议在网关层或应用层实现。
+</Warning>
 
 ## SDK 和示例
 

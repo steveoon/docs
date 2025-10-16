@@ -49,6 +49,7 @@
       },
       {
         "tab": "API 参考",
+        "openapi": "/api-reference/openapi-huajune.json",
         "groups": [
           {
             "group": "API 概览",
@@ -56,16 +57,6 @@
               "api-reference/introduction",
               "api-reference/request-response",
               "api-reference/error-codes"
-            ]
-          },
-          {
-            "group": "端点详解",
-            "pages": [
-              "api-reference/endpoint/chat",
-              "api-reference/endpoint/models",
-              "api-reference/endpoint/tools",
-              "api-reference/endpoint/prompt-types",
-              "api-reference/endpoint/config-schema"
             ]
           }
         ]

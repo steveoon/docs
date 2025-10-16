@@ -5,17 +5,17 @@ description: "API 错误码完整参考"
 
 ## HTTP 状态码
 
-| 状态码 | 错误类型            | 说明               |
-| ------ | ------------------- | ------------------ |
-| 200    | -                   | 请求成功           |
-| 400    | BadRequest          | 请求参数错误       |
-| 401    | Unauthorized        | 认证失败           |
-| 403    | Forbidden           | 权限不足           |
-| 404    | NotFound            | 资源不存在         |
-| 409    | Conflict            | 资源冲突           |
-| 429    | RateLimitExceeded   | 超过速率限制       |
-| 500    | InternalServerError | 服务器内部错误     |
-| 503    | ServiceUnavailable  | 服务暂时不可用     |
+| 状态码 | 错误类型            | 说明                                 |
+| ------ | ------------------- | ------------------------------------ |
+| 200    | -                   | 请求成功                             |
+| 400    | BadRequest          | 请求参数错误                         |
+| 401    | Unauthorized        | 认证失败                             |
+| 403    | Forbidden           | 权限不足                             |
+| 404    | NotFound            | 资源不存在                           |
+| 409    | Conflict            | 资源冲突                             |
+| 429    | TooManyRequests     | 超过速率限制（⚠️ 当前未实现）        |
+| 500    | InternalServerError | 服务器内部错误                       |
+| 503    | ServiceUnavailable  | 服务暂时不可用                       |
 
 ## 错误响应格式
 
@@ -112,10 +112,13 @@ description: "API 错误码完整参考"
 {
   "error": "Unauthorized",
   "message": "Invalid or missing API key",
-  "statusCode": 401,
-  "correlationId": "req_mno345"
+  "statusCode": 401
 }
 ```
+
+<Warning>
+  **注意**：401 认证错误在 middleware 层处理,响应中**不包含** `correlationId` 字段,响应头中也**不包含** `X-Correlation-Id`。只有进入 API 路由后的错误（400、403、500 等）才包含 correlationId。
+</Warning>
 
 **原因**: API Key 无效、过期或未提供
 
@@ -131,8 +134,7 @@ description: "API 错误码完整参考"
 {
   "error": "Unauthorized",
   "message": "Invalid authorization header format",
-  "statusCode": 401,
-  "correlationId": "req_pqr678"
+  "statusCode": 401
 }
 ```
 
@@ -211,33 +213,42 @@ description: "API 错误码完整参考"
 
 **解决方案**: 使用不同的标识符或检查是否已存在
 
-### 429 Rate Limit Exceeded
+### 429 TooManyRequests（当前未实现）
+
+<Warning>
+  **实现状态**：
+  - ❌ 当前 API **未实现**速率限制功能
+  - ❌ 不会返回 429 错误响应
+  - ❌ 不会设置 `Retry-After` 响应头
+  - ✅ 错误类型已定义（`TooManyRequests`），但未在代码中使用
+  - 💡 如需限流,建议在**网关层或 middleware** 实现
+</Warning>
+
+**理论响应格式**（如果实现）：
 
 ```json
 {
-  "error": "RateLimitExceeded",
-  "message": "Rate limit exceeded. Please retry after 10 seconds.",
+  "error": "TooManyRequests",
+  "message": "Rate limit exceeded",
   "statusCode": 429,
-  "retryAfter": 10,
   "correlationId": "req_ghij123"
 }
 ```
 
-**原因**: 超过 API 调用速率限制
-
-**解决方案**:
-1. 实现指数退避重试策略
-2. 减少并发请求数
-3. 在 `retryAfter` 秒后重试
-4. 联系销售团队提升限额
-
-**响应头**:
+**如果实现,建议的响应头**：
 ```http
 Retry-After: 10
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 1609459200
 ```
+
+<Note>
+  **设计说明**：如果未来实现限流功能,建议通过 HTTP 响应头 `Retry-After`（单位：秒）传递重试等待时间。
+</Note>
+
+**如果实现,建议的客户端处理策略**：
+1. 实现指数退避重试策略
+2. 读取响应头 `Retry-After` 获取建议的重试时间
+3. 减少并发请求数
+4. 联系销售团队提升限额
 
 ### 500 Internal Server Error
 
@@ -297,32 +308,43 @@ X-RateLimit-Reset: 1609459200
 
 ### 验证模式报告
 
-使用 `validateOnly: true` 时返回验证报告而非错误:
+使用 `validateOnly: true` 或 `contextStrategy: "report"` 时返回验证报告（不包装在 success/data 中）：
 
 ```json
 {
-  "success": true,
-  "data": {
-    "valid": false,
-    "errors": [
-      {
-        "tool": "zhipin_reply_generator",
-        "missingContext": ["configData", "replyPrompts"]
-      }
-    ]
-  }
+  "valid": false,
+  "model": {
+    "valid": true
+  },
+  "tools": [
+    {
+      "name": "zhipin_reply_generator",
+      "valid": false,
+      "missingContext": ["configData", "replyPrompts"]
+    }
+  ]
 }
 ```
 
-### 流式输出错误
+<Note>
+  **验证报告说明**：
+  - 直接返回 ValidationReport 对象,不包装在 `{success, data}` 中
+  - `valid`: 总体验证是否通过
+  - `model`: 模型验证结果
+  - `tools`: 每个工具的验证结果数组
+</Note>
 
-流式响应中的错误格式:
+### 流式输出中的错误
 
-```
-data: {"type":"error","error":"RateLimitExceeded","message":"Rate limit exceeded"}
+流式响应遇到错误时会中断连接。如果错误发生在流开始后,客户端可能会收到部分数据后断开连接。
 
-data: [DONE]
-```
+<Note>
+  **流式错误处理**：
+  - 流式输出不会返回特殊的错误事件类型
+  - 如果验证失败,不会开始流式响应,直接返回 HTTP 错误（400, 401等）
+  - 如果流式过程中发生错误,连接会中断,客户端需要实现错误恢复机制
+  - 建议在流式请求中实现超时和重试逻辑
+</Note>
 
 ## 错误处理最佳实践
 
@@ -346,7 +368,7 @@ data: [DONE]
   </Accordion>
 
   <Accordion title="实现重试机制">
-    对于 429 和 5xx 错误,实现重试:
+    对于 5xx 错误实现重试（429 当前未实现,代码为未来兼容性保留）：
 
     ```javascript
     async function fetchWithRetry(url, options, maxRetries = 3) {
@@ -354,6 +376,7 @@ data: [DONE]
         try {
           const response = await fetch(url, options);
 
+          // 429 处理（当前不会触发,为未来兼容性保留）
           if (response.status === 429) {
             const retryAfter = parseInt(response.headers.get('Retry-After') || '5');
             await sleep(retryAfter * 1000);
@@ -373,6 +396,10 @@ data: [DONE]
       }
     }
     ```
+
+    <Note>
+      **注意**：当前 API 不会返回 429 错误（未实现限流），429 处理逻辑为未来兼容性保留。
+    </Note>
   </Accordion>
 
   <Accordion title="区分错误类型">
@@ -388,7 +415,8 @@ data: [DONE]
           showPermissionError(); // 权限提示
           break;
         case 429:
-          scheduleRetry(error.retryAfter); // 限流重试
+          // 当前不会触发,为未来兼容性保留
+          scheduleRetry(error.retryAfter || 5);
           break;
         case 500:
         case 503:
@@ -399,6 +427,10 @@ data: [DONE]
       }
     }
     ```
+
+    <Note>
+      **注意**：当前 API 不会返回 429 错误（未实现限流），case 429 为未来兼容性保留。
+    </Note>
   </Accordion>
 
   <Accordion title="使用 validateOnly 预检">

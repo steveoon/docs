@@ -1,0 +1,1036 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "华骏智能招聘 API",
+    "description": "华骏智能招聘助手的 Open API 接口文档，提供模型管理、对话、工具、配置等功能",
+    "version": "1.0.0",
+    "contact": {
+      "name": "华骏科技",
+      "url": "https://huajune.duliday.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://huajune.duliday.com/api/v1",
+      "description": "生产环境"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/models": {
+      "get": {
+        "summary": "获取可用模型列表",
+        "description": "返回所有可用的 AI 模型及其分类信息。响应会被缓存 1 小时。",
+        "operationId": "getModels",
+        "tags": ["Models"],
+        "responses": {
+          "200": {
+            "description": "成功获取模型列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "models": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Model"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "description": "请求关联 ID",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "缓存控制策略",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=3600"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/chat": {
+      "post": {
+        "summary": "发起 AI 对话",
+        "description": "与 AI 模型进行对话，支持流式和非流式输出、工具调用、消息剪裁等功能。\n\n**操作限制**：\n- 最大请求时长：300 秒（5 分钟）\n- 工具调用步数限制：30 步\n- 工具调用超过限制后会自动停止\n\n**流式输出**：\n- 当 `stream=true` 时，返回 AI SDK 标准流式响应（text/event-stream）\n- 流式响应包含实时生成的消息内容和工具调用\n\n**验证模式**：\n- 当 `validateOnly=true` 或 `contextStrategy=\"report\"` 时，返回 ValidationReport 而非实际对话响应",
+        "operationId": "createChat",
+        "tags": ["Chat"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              },
+              "examples": {
+                "basicChat": {
+                  "summary": "基本对话",
+                  "value": {
+                    "model": "anthropic/claude-3-7-sonnet-20250219",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "你好"
+                      }
+                    ]
+                  }
+                },
+                "withValidation": {
+                  "summary": "验证模式",
+                  "value": {
+                    "model": "anthropic/claude-3-7-sonnet-20250219",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "测试消息"
+                      }
+                    ],
+                    "validateOnly": true,
+                    "allowedTools": ["zhipin_reply_generator"],
+                    "context": {
+                      "configData": {}
+                    }
+                  }
+                },
+                "withTools": {
+                  "summary": "使用工具",
+                  "value": {
+                    "model": "anthropic/claude-3-7-sonnet-20250219",
+                    "messages": [
+                      {
+                        "role": "user",
+                        "content": "帮我生成招聘回复"
+                      }
+                    ],
+                    "promptType": "bossZhipinSystemPrompt",
+                    "allowedTools": ["zhipin_reply_generator"],
+                    "context": {
+                      "configData": {
+                        "brandName": "测试品牌"
+                      },
+                      "replyPrompts": {},
+                      "systemPrompts": {
+                        "bossZhipinSystemPrompt": "你是招聘助手..."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "对话成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ChatResponse",
+                      "description": "非流式响应（stream=false）"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ValidationReport",
+                      "description": "验证报告（validateOnly=true 或 contextStrategy=report）"
+                    }
+                  ]
+                },
+                "examples": {
+                  "nonStreamingResponse": {
+                    "summary": "非流式响应",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "messages": [
+                          {
+                            "role": "user",
+                            "content": "你好"
+                          },
+                          {
+                            "role": "assistant",
+                            "content": "你好！有什么我可以帮助你的吗？"
+                          }
+                        ],
+                        "usage": {
+                          "inputTokens": 10,
+                          "outputTokens": 15,
+                          "totalTokens": 25
+                        },
+                        "tools": {
+                          "used": [],
+                          "skipped": []
+                        }
+                      }
+                    }
+                  },
+                  "validationReport": {
+                    "summary": "验证报告",
+                    "value": {
+                      "valid": false,
+                      "model": {
+                        "valid": true
+                      },
+                      "tools": [
+                        {
+                          "name": "zhipin_reply_generator",
+                          "valid": false,
+                          "missingContext": ["replyPrompts"]
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string",
+                  "description": "AI SDK 标准流式响应格式（stream=true 时）\n\n流式响应是服务器发送事件（SSE）格式，包含实时生成的消息片段。每个事件包含增量数据。"
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "description": "请求关联 ID，用于追踪请求",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Message-Pruned": {
+                "description": "是否进行了消息剪裁（仅当 prune=true 且实际发生剪裁时存在）",
+                "schema": {
+                  "type": "string",
+                  "enum": ["true"]
+                }
+              },
+              "X-Tools-Skipped": {
+                "description": "跳过的工具名称列表，逗号分隔（仅当有工具被跳过时存在）",
+                "schema": {
+                  "type": "string",
+                  "example": "tool1,tool2"
+                }
+              },
+              "Cache-Control": {
+                "description": "缓存控制（仅流式响应）",
+                "schema": {
+                  "type": "string",
+                  "example": "no-cache"
+                }
+              },
+              "X-Accel-Buffering": {
+                "description": "禁用代理缓冲（仅流式响应）",
+                "schema": {
+                  "type": "string",
+                  "example": "no"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/tools": {
+      "get": {
+        "summary": "获取可用工具列表",
+        "description": "返回所有对外公开的 AI 工具及其配置要求。响应会被缓存 1 小时。",
+        "operationId": "getTools",
+        "tags": ["Tools"],
+        "responses": {
+          "200": {
+            "description": "成功获取工具列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "tools": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Tool"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "description": "请求关联 ID",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "缓存控制策略",
+                "schema": {
+                  "type": "string",
+                  "example": "public, max-age=3600"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/prompt-types": {
+      "get": {
+        "summary": "获取系统提示词类型列表",
+        "description": "返回所有可用的 promptType 枚举值及其说明",
+        "operationId": "getPromptTypes",
+        "tags": ["Configuration"],
+        "responses": {
+          "200": {
+            "description": "成功获取提示词类型列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "promptTypes": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PromptType"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "description": "请求关联 ID",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/config-schema": {
+      "get": {
+        "summary": "获取配置字段的类型定义",
+        "description": "返回 Chat API 中 context、sandboxId、toolContext 参数的字段类型说明",
+        "operationId": "getConfigSchema",
+        "tags": ["Configuration"],
+        "responses": {
+          "200": {
+            "description": "成功获取配置字段定义",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigSchema"
+                }
+              }
+            },
+            "headers": {
+              "X-Correlation-Id": {
+                "description": "请求关联 ID",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "使用 Bearer Token 进行认证，格式：`Bearer YOUR_API_KEY`"
+      }
+    },
+    "schemas": {
+      "Model": {
+        "type": "object",
+        "required": ["id", "name", "categories"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "模型 ID，格式：provider/model",
+            "example": "anthropic/claude-3-7-sonnet-20250219"
+          },
+          "name": {
+            "type": "string",
+            "description": "模型显示名称",
+            "example": "Claude 3.7 Sonnet"
+          },
+          "categories": {
+            "type": "array",
+            "description": "模型分类标签",
+            "items": {
+              "type": "string",
+              "enum": ["chat", "general"]
+            },
+            "example": ["chat"]
+          }
+        }
+      },
+      "ChatRequest": {
+        "type": "object",
+        "required": ["model", "messages"],
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "模型 ID，格式：provider/model",
+            "example": "anthropic/claude-3-7-sonnet-20250219"
+          },
+          "messages": {
+            "type": "array",
+            "description": "对话消息数组。支持两种格式：\n1. AI SDK 标准格式（UIMessage）：包含 role、content、parts 等完整字段，支持工具调用历史\n2. 简化格式：仅包含 {role, content}，服务端会自动归一化为 UIMessage 格式",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "是否启用流式输出。流式输出返回 text/event-stream 格式，非流式返回完整 JSON 响应。",
+            "default": true
+          },
+          "prune": {
+            "type": "boolean",
+            "description": "是否启用消息剪裁。启用后会根据 pruneOptions 配置自动删除历史消息以控制 token 数量。",
+            "default": false
+          },
+          "pruneOptions": {
+            "$ref": "#/components/schemas/PruneOptions"
+          },
+          "systemPrompt": {
+            "type": "string",
+            "description": "直接指定系统提示词，优先级高于 promptType。如果同时指定了 promptType，此字段优先使用。"
+          },
+          "promptType": {
+            "type": "string",
+            "description": "系统提示词类型。从 context.systemPrompts 中查找对应的提示词。如果找不到会使用默认提示词。",
+            "enum": ["bossZhipinSystemPrompt", "bossZhipinLocalSystemPrompt", "generalComputerSystemPrompt"]
+          },
+          "allowedTools": {
+            "type": "array",
+            "description": "允许使用的工具名称列表。如果不指定，会根据 promptType 自动启用对应的工具集。",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contextStrategy": {
+            "type": "string",
+            "description": "上下文缺失处理策略：\n- `error`：缺少必需上下文时抛出错误（默认）\n- `skip`：缺少必需上下文时跳过该工具，继续执行\n- `report`：返回验证报告，不实际执行对话",
+            "enum": ["error", "skip", "report"],
+            "default": "error"
+          },
+          "sandboxId": {
+            "type": "string",
+            "nullable": true,
+            "description": "E2B 沙盒 ID。使用需要沙盒的工具（如 bash、computer）时必需。可以设为 null 表示不使用沙盒。"
+          },
+          "context": {
+            "$ref": "#/components/schemas/ChatContext"
+          },
+          "toolContext": {
+            "type": "object",
+            "description": "工具特定上下文映射。键为工具名，值为该工具的特定配置。可以覆盖 context 中的同名字段。",
+            "additionalProperties": {
+              "type": "object"
+            }
+          },
+          "validateOnly": {
+            "type": "boolean",
+            "description": "仅验证模式。设为 true 时，只验证参数和上下文是否正确，不实际执行对话。返回 ValidationReport 而非对话响应。",
+            "default": false
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "description": "消息对象。实际 API 支持 AI SDK 的完整 UIMessage 格式（包含 parts、toolInvocations 等），但为了简化文档，此处只描述最基本的字段。",
+        "required": ["role", "content"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["user", "assistant", "system"],
+            "description": "消息角色"
+          },
+          "content": {
+            "type": "string",
+            "description": "消息内容。注意：AI SDK 的 UIMessage 实际可能包含更复杂的结构（如 parts 数组），但简化格式只需此字段。"
+          }
+        }
+      },
+      "ChatContext": {
+        "type": "object",
+        "description": "全局上下文配置。包含各种工具可能需要的配置数据。具体字段的类型定义可通过 /config-schema 端点获取。",
+        "properties": {
+          "preferredBrand": {
+            "type": "string",
+            "description": "首选品牌名称"
+          },
+          "modelConfig": {
+            "type": "object",
+            "description": "模型配置对象，包含不同提供商的 API 配置"
+          },
+          "configData": {
+            "type": "object",
+            "description": "业务配置数据，zhipin_reply_generator 等工具需要"
+          },
+          "systemPrompts": {
+            "type": "object",
+            "description": "系统提示词映射。键为 promptType，值为对应的系统提示词文本。",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "replyPrompts": {
+            "type": "object",
+            "description": "回复提示词配置，zhipin_reply_generator 工具需要"
+          },
+          "dulidayToken": {
+            "type": "string",
+            "nullable": true,
+            "description": "Duliday API 访问令牌，duliday 相关工具需要"
+          },
+          "defaultWechatId": {
+            "type": "string",
+            "nullable": true,
+            "description": "默认微信号，微信相关工具使用"
+          }
+        }
+      },
+      "PruneOptions": {
+        "type": "object",
+        "description": "消息剪裁选项。当 prune=true 时生效。未指定的字段使用默认值。",
+        "properties": {
+          "maxOutputTokens": {
+            "type": "integer",
+            "description": "最大输出 token 数。预留给模型输出的 token 配额。",
+            "default": 100000
+          },
+          "targetTokens": {
+            "type": "integer",
+            "description": "目标 token 数。剪裁后希望达到的输入 token 数量。",
+            "default": 80000
+          },
+          "preserveRecentMessages": {
+            "type": "integer",
+            "description": "保留最近消息数量。最近的 N 条消息不会被剪裁。",
+            "default": 3
+          }
+        }
+      },
+      "ChatResponse": {
+        "type": "object",
+        "description": "非流式对话响应（stream=false 时）",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "array",
+                "description": "完整的对话历史，包含用户输入和 AI 响应。使用 AI SDK 的 UIMessage 格式，包含工具调用的完整历史。",
+                "items": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              },
+              "usage": {
+                "$ref": "#/components/schemas/Usage"
+              },
+              "tools": {
+                "$ref": "#/components/schemas/ToolUsage"
+              }
+            }
+          }
+        }
+      },
+      "ValidationReport": {
+        "type": "object",
+        "description": "验证报告。当 validateOnly=true 或 contextStrategy=report 时返回。不包装在 success/data 中。",
+        "required": ["valid", "model", "tools"],
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "description": "总体验证是否通过"
+          },
+          "model": {
+            "type": "object",
+            "description": "模型验证结果",
+            "required": ["valid"],
+            "properties": {
+              "valid": {
+                "type": "boolean",
+                "description": "模型是否有效"
+              },
+              "error": {
+                "type": "string",
+                "description": "错误信息（仅当 valid=false 时）"
+              }
+            }
+          },
+          "tools": {
+            "type": "array",
+            "description": "每个工具的验证结果",
+            "items": {
+              "type": "object",
+              "required": ["name", "valid"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "工具名称"
+                },
+                "valid": {
+                  "type": "boolean",
+                  "description": "工具上下文是否有效"
+                },
+                "missingContext": {
+                  "type": "array",
+                  "description": "缺失的上下文字段列表",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "structureErrors": {
+                  "type": "array",
+                  "description": "上下文结构错误",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "description": "错误字段名"
+                      },
+                      "issues": {
+                        "type": "array",
+                        "description": "字段的错误列表",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "error": {
+                  "type": "string",
+                  "description": "错误信息（仅当 valid=false 时）"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Usage": {
+        "type": "object",
+        "description": "Token 使用统计。遵循 AI SDK 的字段命名（inputTokens/outputTokens，而非 promptTokens/completionTokens）。所有字段都是可选的，部分提供商可能不报告某些值。",
+        "properties": {
+          "inputTokens": {
+            "type": "integer",
+            "description": "输入（提示）token 数量"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "description": "输出（生成）token 数量"
+          },
+          "totalTokens": {
+            "type": "integer",
+            "description": "总 token 数量（可能不等于 input + output，因为可能包含开销）"
+          },
+          "reasoningTokens": {
+            "type": "integer",
+            "description": "推理 token 数量（仅部分模型支持，如 o1 系列）"
+          },
+          "cachedInputTokens": {
+            "type": "integer",
+            "description": "缓存的输入 token 数量（仅部分提供商支持）"
+          }
+        }
+      },
+      "ToolUsage": {
+        "type": "object",
+        "description": "工具使用统计",
+        "properties": {
+          "used": {
+            "type": "array",
+            "description": "已成功启用的工具名称列表",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "description": "已跳过的工具名称列表（通常因上下文缺失）",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "Tool": {
+        "type": "object",
+        "required": ["name", "description", "category", "requiresSandbox", "requiredContext"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "工具名称",
+            "example": "zhipin_reply_generator"
+          },
+          "description": {
+            "type": "string",
+            "description": "工具功能描述",
+            "example": "生成智能招聘回复"
+          },
+          "category": {
+            "type": "string",
+            "description": "工具分类",
+            "enum": ["universal", "communication", "business", "yupao", "duliday"],
+            "example": "business"
+          },
+          "requiresSandbox": {
+            "type": "boolean",
+            "description": "是否需要沙箱环境（需要提供 sandboxId）",
+            "example": false
+          },
+          "requiredContext": {
+            "type": "array",
+            "description": "工具所需的上下文字段列表。这些字段必须在 context 或 toolContext 中提供。",
+            "items": {
+              "type": "string"
+            },
+            "example": ["configData", "replyPrompts"]
+          }
+        }
+      },
+      "PromptType": {
+        "type": "object",
+        "required": ["id", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "提示词类型标识符",
+            "enum": ["bossZhipinSystemPrompt", "bossZhipinLocalSystemPrompt", "generalComputerSystemPrompt"],
+            "example": "bossZhipinSystemPrompt"
+          },
+          "description": {
+            "type": "string",
+            "description": "类型描述",
+            "example": "BOSS直聘招聘助手系统提示词"
+          }
+        }
+      },
+      "ConfigSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "context": {
+                "type": "object",
+                "description": "上下文字段定义。每个字段包含 type、required、description。",
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/FieldDefinition"
+                }
+              },
+              "sandboxId": {
+                "$ref": "#/components/schemas/FieldDefinition"
+              },
+              "toolContext": {
+                "$ref": "#/components/schemas/FieldDefinition"
+              }
+            }
+          }
+        }
+      },
+      "FieldDefinition": {
+        "type": "object",
+        "required": ["type", "required", "description"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "字段的 TypeScript 类型表示",
+            "example": "string"
+          },
+          "required": {
+            "oneOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "description": "是否必需。可以是布尔值（false 表示可选），或描述字符串（如 \"按工具需要\"）。",
+            "example": false
+          },
+          "description": {
+            "type": "string",
+            "description": "字段说明",
+            "example": "首选品牌名称"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error", "message", "statusCode"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "错误类型",
+            "example": "BadRequest"
+          },
+          "message": {
+            "type": "string",
+            "description": "错误消息",
+            "example": "Invalid request parameters"
+          },
+          "statusCode": {
+            "type": "integer",
+            "description": "HTTP 状态码",
+            "example": 400
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "请求关联 ID（401 错误不包含此字段）",
+            "example": "abc123"
+          },
+          "details": {
+            "type": "object",
+            "description": "详细错误信息（可选）"
+          }
+        }
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "未授权 - API Key 无效或缺失",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string",
+                  "example": "Unauthorized"
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Invalid or missing API key"
+                },
+                "statusCode": {
+                  "type": "integer",
+                  "example": 401
+                }
+              }
+            }
+          }
+        }
+      },
+      "BadRequestError": {
+        "description": "请求参数错误",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Error"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "details": {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "Zod 验证错误详情"
+                        },
+                        "missingContext": {
+                          "type": "array",
+                          "description": "缺失的上下文字段列表（仅工具创建失败时）",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "headers": {
+          "X-Correlation-Id": {
+            "description": "请求关联 ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ForbiddenError": {
+        "description": "模型验证失败",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Error"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "details": {
+                      "type": "object",
+                      "properties": {
+                        "model": {
+                          "type": "string",
+                          "description": "无效的模型 ID"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "headers": {
+          "X-Correlation-Id": {
+            "description": "请求关联 ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "服务器内部错误",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Error"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "details": {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "description": "详细错误信息"
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "headers": {
+          "X-Correlation-Id": {
+            "description": "请求关联 ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Models",
+      "description": "模型管理相关接口"
+    },
+    {
+      "name": "Chat",
+      "description": "AI 对话相关接口"
+    },
+    {
+      "name": "Tools",
+      "description": "工具管理相关接口"
+    },
+    {
+      "name": "Configuration",
+      "description": "配置管理相关接口"
+    }
+  ]
+}
